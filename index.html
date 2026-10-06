@@ -226,7 +226,7 @@
 <button id="btnHelp" title="How to play">❓</button>
 <button id="btnRestart" title="New round">↺</button>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v12</span></footer>
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v13</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -395,7 +395,7 @@ function ensurePhys(){
   ground.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2);
   physWorld.add(ground);
   const wall=(x,z,hx,hz)=>{ const b=new CANNON.Body({mass:0,material:wallM});
-    b.addShape(new CANNON.Box(new CANNON.Vec3(hx,3,hz))); b.position.set(x,3,z); physWorld.add(b); };
+    b.addShape(new CANNON.Box(new CANNON.Vec3(hx,5,hz))); b.position.set(x,4,z); physWorld.add(b); };
   wall(-4.6,0.6,0.3,5.2); wall(4.6,0.6,0.3,5.2); wall(0,-4.4,5.2,0.3); wall(0,5.6,5.2,0.3);
   physDieMat=dieM;
 }
@@ -449,9 +449,9 @@ function physicsThrow(holds,heldVals,forced,done){
       if(st.held||st.body) continue;
       if(t<st.spawnAt) continue;
       if(!st.pick){
-        const dir=st.m===die1?-1:1;
+        const dir=st.m===die1?-1:1; // separated launch zones so dice never spawn overlapped
         st.pick={t0:t,fp:st.m.position.clone(),fq:st.m.quaternion.clone(),
-          tp:new THREE.Vector3(dir*(0.4+Math.random()*1.2),4.6+Math.random()*2,3.4+Math.random()*0.8),
+          tp:new THREE.Vector3(dir*(0.7+Math.random()*1.1),3.8+Math.random()*1.2,(dir<0?3.2:3.9)+Math.random()*0.5),
           tq:new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28))};
       }
       const k=Math.min(1,(t-st.pick.t0)/160); // quick scoop from table into the air
@@ -478,13 +478,24 @@ function physicsThrow(holds,heldVals,forced,done){
       return (st.forcedVal!=null)?st.forcedVal:topValue(st.body);
     });
     for(const st of state){ if(st.body){ try{physWorld.remove(st.body);}catch(e){} st.body=null; } }
-    if(forced){ // remote view: ease into the authoritative faces as dice settle
+    // failsafe: pull any runaway die back into view (orientation untouched — value already read)
+    const moves=state.map((st,i)=>{
+      if(st.held) return null;
+      const p=st.m.position;
+      if(Math.abs(p.x)<4.4&&p.z>-4.4&&p.z<6.0) return null;
+      return {i,fp:p.clone(),tp:new THREE.Vector3(THREE.MathUtils.clamp(p.x,-2.4,2.4),0.8,THREE.MathUtils.clamp(p.z,-1.8,2.2))};
+    });
+    if(forced||moves.some(m=>m)){
       const q0s=state.map(st=>st.m.quaternion.clone());
       const q1s=vals.map(v=>targetQuat(v));
       const T1=performance.now();
       const tw=(t)=>{
-        const k=Math.min(1,(t-T1)/220), e=k*k*(3-2*k);
-        state.forEach((st,i)=>{ if(!st.held) st.m.quaternion.slerpQuaternions(q0s[i],q1s[i],e); });
+        const k=Math.min(1,(t-T1)/240), e=k*k*(3-2*k);
+        state.forEach((st,i)=>{
+          if(st.held) return;
+          if(moves[i]) st.m.position.lerpVectors(moves[i].fp,moves[i].tp,e);
+          if(forced) st.m.quaternion.slerpQuaternions(q0s[i],q1s[i],e);
+        });
         if(k<1) requestAnimationFrame(tw); else done(vals);
       };
       requestAnimationFrame(tw);
