@@ -226,7 +226,7 @@
 <button id="btnHelp" title="How to play">❓</button>
 <button id="btnRestart" title="New round">↺</button>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v11</span></footer>
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v12</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -507,6 +507,8 @@ function isMyTurn(){
   return false;
 }
 function turnLabel(){ return `${S.names[S.turn]}'s turn`; }
+// true while the computer opponent should be acting (solo mode, AI's turn)
+function aiTurn(){ return S.mode==='solo'&&S.turn===1&&S.canPlay&&!S.over; }
 
 function startGame(mode){
   S.mode=mode; setNames();
@@ -521,7 +523,8 @@ function startGame(mode){
 }
 
 function doRoll(){
-  if(!S.canPlay||S.over||!isMyTurn()||animating||S.rolling) return;
+  if(!S.canPlay||S.over||animating||S.rolling) return;
+  if(!isMyTurn()&&!aiTurn()) return;
   if(S.hasRolled && S.rollsLeft<=0) return;
   if(S.hasRolled && S.locked[0] && S.locked[1]) return; // nothing to throw
   if(S.hasRolled) S.rollsLeft--;
@@ -565,7 +568,8 @@ function toggleHold(i){
 }
 
 function bank(){
-  if(!S.canPlay||S.over||!isMyTurn()||!S.hasRolled||S.rolling) return;
+  if(!S.canPlay||S.over||!S.hasRolled||S.rolling) return;
+  if(!isMyTurn()&&!aiTurn()) return;
   S.totals[S.turn]+=S.turnScore;
   log(`💰 ${S.names[S.turn]} BANKED ${S.turnScore} → total ${S.totals[S.turn]}`);
   if(S.mode==='online') netSend({t:'bank',totals:S.totals});
