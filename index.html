@@ -28,8 +28,6 @@
     background:linear-gradient(180deg,#0e5c46,#07352a); min-height:0;}
   #c3d{width:100%; height:calc(100vh - 130px); height:calc(100svh - 130px); min-height:440px; display:block; cursor:pointer; touch-action:manipulation;}
   #diceHint{font-size:11px; background:#000a; border-radius:8px; padding:4px 10px; pointer-events:none;}
-  #hudChips{font-size:12px; background:#000a; border-radius:8px; padding:3px 10px; opacity:.95;}
-  #hudChips b{color:var(--accent);}
   #setupOverlay{position:fixed; inset:0; background:#050816ee; display:flex; align-items:center; justify-content:center; z-index:20; padding:16px; backdrop-filter:blur(4px);}
   #setupBox{background:var(--panel); border-radius:20px; padding:28px 24px; max-width:400px; width:100%; text-align:center; border:1px solid #ffffff2a; box-shadow:0 24px 80px #000c;}
   #setupBox h2{margin:0 0 10px; color:var(--accent);}
@@ -132,7 +130,6 @@
         <div class="p" id="p1"><div class="nm" id="n1">Opponent</div><div class="tot" id="t1">0</div><div class="sub" id="s1">turn: 0 • rerolls: 4</div></div>
       </div>
       <div id="hudBottom">
-        <div id="hudChips">Bal <b id="balanceHud">1000</b> • Pot <b id="potHud">0</b></div>
         <div id="turnTotal">TURN TOTAL: –</div>
         <p id="turnInfo">Pick a mode above to play.</p>
         <div id="diceHint">Tap a die (after first roll) to HOLD / UNHOLD it • double 1s = BUST!</div>
@@ -169,11 +166,9 @@
     <div class="card" id="betCard">
       <h3>💰 BET</h3>
       <div class="row">
-        <input id="betInput" type="number" min="10" max="500" value="50" />
         <input id="nameInput" placeholder="Your name" maxlength="14" value="Player1" />
       </div>
-      <div style="font-size:13px;">Balance: <b id="balance">1000</b> chips • Pot: <b id="pot">0</b></div>
-      <div style="font-size:12px; opacity:.75">Both players bet the same amount. Winner takes the whole pot.</div>
+      <div style="font-size:12px; opacity:.75">Free play — betting comes back when development is complete.</div>
     </div>
 
     <div class="card" id="playCard">
@@ -223,7 +218,7 @@
       <button id="btnSetupGo">Start</button>
       <button id="btnSetupCancel" class="ghost">Cancel</button>
     </div>
-    <div style="font-size:12px; opacity:.75; margin-top:8px;">Balance: <b id="setupBal">1000</b> chips</div>
+    <div style="font-size:12px; opacity:.75; margin-top:8px;">Free play — no chips while the game is in development</div>
   </div>
 </div>
 
@@ -231,7 +226,7 @@
 <button id="btnHelp" title="How to play">❓</button>
 <button id="btnRestart" title="New round">↺</button>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v9</span></footer>
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v10</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -245,14 +240,9 @@ let S = {
   names:['You','Opponent'],
   totals:[0,0], turnScore:0, dice:[1,1], locked:[false,false],
   rollsLeft:4, hasRolled:false, turn:0, myIndex:0,
-  bet:50, pot:0, over:false, canPlay:false, rolling:false,
-  balance: parseInt(localStorage.getItem('dice100_balance')||'1000',10)
+  bet:0, pot:0, over:false, canPlay:false, rolling:false,
 };
-function saveBal(){ localStorage.setItem('dice100_balance', S.balance); }
-function paintBal(){ $('balance').textContent=S.balance; $('pot').textContent=S.pot;
-  if($('balanceHud')) $('balanceHud').textContent=S.balance;
-  if($('potHud')) $('potHud').textContent=S.pot; }
-paintBal();
+// chips/betting removed while the game is in development — free play for now
 
 function setNames(){ S.names[0]=$('nameInput').value||'Player1';
   if(S.mode==='online'){} else if(S.mode==='solo'){S.names=['You','AI 🤖'];} else if(S.mode==='local'){S.names=[$('nameInput').value||'P1','P2'];}
@@ -271,7 +261,6 @@ function paint(){
   }
   $('lastRoll').textContent = S.rolling ? '🎲 rolling…' : (S.hasRolled ? `dice ${S.dice[0]} + ${S.dice[1]} = ${S.dice[0]+S.dice[1]} → turn total ${S.turnScore}` : '–');
   $('holdInfo').innerHTML = (!S.rolling && S.hasRolled) ? ` &nbsp; ${S.locked[0]?'<span class="holdTag">DIE 1 HELD</span>':''} ${S.locked[1]?'<span class="holdTag">DIE 2 HELD</span>':''}` : '';
-  paintBal();
   const myTurn = isMyTurn();
   $('btnRoll').disabled = S.rolling || !(S.canPlay && !S.over && myTurn && (!S.hasRolled || S.rollsLeft>0) && !(S.locked[0]&&S.locked[1]&&S.hasRolled));
   $('btnBank').disabled = S.rolling || !(S.canPlay && !S.over && myTurn && S.hasRolled);
@@ -519,15 +508,13 @@ function isMyTurn(){
 }
 function turnLabel(){ return `${S.names[S.turn]}'s turn`; }
 
-function startGame(mode,bet){
-  bet=Math.max(10,Math.min(500,parseInt(bet)||50));
-  if(S.balance<bet){ log('❌ Not enough balance for that bet.'); return false; }
+function startGame(mode){
   S.mode=mode; setNames();
-  S.bet=bet; S.pot=bet*2; S.balance-=bet; saveBal();
+  S.bet=0; S.pot=0;
   S.totals=[0,0]; S.turnScore=0; S.dice=[1,1]; S.locked=[false,false];
   S.rollsLeft=4; S.hasRolled=false; S.turn=0; S.over=false; S.canPlay=true; S.rolling=false;
   $('modePill').textContent = mode==='solo'?'solo vs AI':mode==='local'?'local 2P':'online';
-  log(`🃏 New game — mode <b>${mode}</b>, bet <b>${bet}</b>, pot <b>${S.pot}</b>. ${turnLabel()} rolls first.`);
+  log(`🃏 New game — mode <b>${mode}</b>. ${turnLabel()} rolls first.`);
   $('turnInfo').textContent = `${turnLabel()} — press ROLL. (4 rerolls available)`;
   paint();
   return true;
@@ -596,20 +583,14 @@ function endTurn(){
 
 function win(idx){
   S.over=true; S.canPlay=false;
-  // Winner takes the pot. Bet was already deducted at game start,
-  // so credit the full pot to the winner's balance on the winner's client.
   if(S.mode==='online'){
-    if(idx===S.myIndex){ S.balance+=S.pot; }
     netSend({t:'win',winner:idx,totals:S.totals});
-  } else {
-    if(idx===0) S.balance+=S.pot;
-    // local P2 win or AI win: bet stays lost (pass-and-play / house)
   }
-  saveBal(); paint();
+  paint();
   const wname=S.names[idx];
-  log(`🏆 <b>${wname}</b> reached ${S.totals[idx]} and wins <b>${S.pot}</b> chips!`);
+  log(`🏆 <b>${wname}</b> reached ${S.totals[idx]} and wins the game!`);
   $('ovTitle').textContent = (S.mode==='online') ? (idx===S.myIndex?'🏆 You win!':'😞 Opponent wins') : (idx===0?'🏆 You win!':'🤖 AI / P2 wins');
-  $('ovText').textContent = `${wname} finished with ${S.totals[idx]} points and takes the ${S.pot}-chip pot. Final: ${S.names[0]} ${S.totals[0]} — ${S.names[1]} ${S.totals[1]}.`;
+  $('ovText').textContent = `${wname} finished with ${S.totals[idx]} points. Final: ${S.names[0]} ${S.totals[0]} — ${S.names[1]} ${S.totals[1]}.`;
   $('overlay').classList.remove('hidden');
   blip(880);
 }
@@ -646,40 +627,32 @@ let setupMode=null;
 function openSetup(mode){
   setupMode=mode;
   const F=$('setupFields'); F.innerHTML='';
-  $('setupBal').textContent=S.balance;
   const fld=(id,label,val,type)=>{ F.insertAdjacentHTML('beforeend',
     `<label>${label}</label><input id="${id}" type="${type||'text'}" value="${val||''}" maxlength="14" />`); };
   if(mode==='solo'){ $('setupTitle').textContent='🤖 Solo vs AI'; $('btnSetupGo').textContent='▶ Start game';
-    fld('su_name','Your name',$('nameInput').value||'Player1'); fld('su_bet','Bet (10–500)',$('betInput').value,'number'); }
+    fld('su_name','Your name',$('nameInput').value||'Player1'); }
   else if(mode==='local'){ $('setupTitle').textContent='👥 Local 2 Players'; $('btnSetupGo').textContent='▶ Start game';
-    fld('su_name','Player 1 name',$('nameInput').value||'Player1'); fld('su_name2','Player 2 name','Player2'); fld('su_bet','Bet (10–500)',$('betInput').value,'number'); }
+    fld('su_name','Player 1 name',$('nameInput').value||'Player1'); fld('su_name2','Player 2 name','Player2'); }
   else if(mode==='host'){ $('setupTitle').textContent='🌐 Create Room'; $('btnSetupGo').textContent='📡 Create room';
-    fld('su_name','Your name',$('nameInput').value||'Host'); fld('su_bet','Bet (10–500)',$('betInput').value,'number'); }
+    fld('su_name','Your name',$('nameInput').value||'Host'); }
   else { $('setupTitle').textContent='🔑 Join Room'; $('btnSetupGo').textContent='📞 Connect';
     fld('su_code','Room code',''); fld('su_name','Your name',$('myName').value||'Guest'); }
   $('setupOverlay').classList.remove('hidden');
 }
-function setupBet(){ const b=Math.max(10,Math.min(500,parseInt(($('su_bet')||{}).value)||50)); return b; }
 $('btnSetupCancel').onclick=()=>$('setupOverlay').classList.add('hidden');
 $('btnSetupGo').onclick=()=>{
   const name=(($('su_name')||{}).value||'Player').slice(0,14);
   if(setupMode==='solo'){
-    const bet=setupBet();
-    if(bet>S.balance){ $('setupBal').textContent=S.balance+' — not enough for '+bet; return; }
-    $('nameInput').value=name; $('betInput').value=bet;
+    $('nameInput').value=name;
     S.myIndex=0; $('setupOverlay').classList.add('hidden');
-    if(startGame('solo',bet)) $('btnStart').classList.add('hidden');
+    if(startGame('solo')) $('btnStart').classList.add('hidden');
   } else if(setupMode==='local'){
-    const bet=setupBet();
-    if(bet>S.balance){ $('setupBal').textContent=S.balance+' — not enough for '+bet; return; }
     const n2=(($('su_name2')||{}).value||'Player2').slice(0,14);
-    $('nameInput').value=name; $('betInput').value=bet;
+    $('nameInput').value=name;
     S.myIndex=0; $('setupOverlay').classList.add('hidden');
-    if(startGame('local',bet)){ S.names=[name,n2]; $('btnStart').classList.add('hidden'); paint(); }
+    if(startGame('local')){ S.names=[name,n2]; $('btnStart').classList.add('hidden'); paint(); }
   } else if(setupMode==='host'){
-    const bet=setupBet();
-    if(bet>S.balance){ $('setupBal').textContent=S.balance+' — not enough for '+bet; return; }
-    $('nameInput').value=name; $('betInput').value=bet;
+    $('nameInput').value=name;
     $('setupOverlay').classList.add('hidden');
     hostRoom();
   } else {
@@ -753,13 +726,10 @@ function onNet(m){
     log(`👋 ${m.name} connected.`); paint(); }
   if(S.myIndex===1 && m.t==='start'){
     S.mode='online'; S.names[0]=m.host; $('n0').textContent=S.names[0];
-    S.bet=m.bet;
-    if(S.balance<m.bet){ log('❌ Not enough balance to match bet!'); return; }
-    S.balance-=m.bet; saveBal();
-    S.pot=m.bet*2; S.totals=[0,0]; S.turnScore=0; S.locked=[false,false];
+    S.totals=[0,0]; S.turnScore=0; S.locked=[false,false];
     S.rollsLeft=4; S.hasRolled=false; S.turn=0; S.over=false; S.canPlay=true; S.rolling=false;
     $('modePill').textContent='online';
-    log(`🃏 Host started: bet ${m.bet}, pot ${S.pot}. Host rolls first.`);
+    log(`🃏 Host started the game. Host rolls first.`);
     $('turnInfo').textContent=`${turnLabel()} — wait for opponent…`;
     paint();
   }
@@ -778,9 +748,9 @@ function onNet(m){
   if(m.t==='turn'){ S.turn=m.turn; S.turnScore=0; S.locked=[false,false]; S.rollsLeft=4; S.hasRolled=false; S.rolling=false;
     $('turnInfo').textContent = isMyTurn()?`Your turn — press ROLL.`:`${turnLabel()} is playing…`; paint(); }
   if(m.t==='win'){ S.totals=m.totals||S.totals; S.over=true; S.canPlay=false;
-    const idx=m.winner; if(idx===S.myIndex) S.balance+=S.pot; saveBal(); paint();
+    const idx=m.winner; paint();
     $('ovTitle').textContent = idx===S.myIndex?'🏆 You win!':'😞 Opponent wins';
-    $('ovText').textContent=`Final: ${S.names[0]} ${S.totals[0]} — ${S.names[1]} ${S.totals[1]}. Pot: ${S.pot}.`;
+    $('ovText').textContent=`Final: ${S.names[0]} ${S.totals[0]} — ${S.names[1]} ${S.totals[1]}.`;
     $('overlay').classList.remove('hidden'); }
 }
 
@@ -800,18 +770,17 @@ $('btnWaitCopy').onclick=()=>{ if(roomCode&&navigator.clipboard) navigator.clipb
 $('btnWaitCancel').onclick=cancelNet;
 $('btnRoll').onclick=doRoll;
 $('btnBank').onclick=bank;
-$('btnNew').onclick=()=>{ if(S.mode==='online'&&S.myIndex===0){ startGame('online',$('betInput').value); netSend({t:'start',bet:S.bet,host:S.names[0]});} else if(S.mode!=='online'){ startGame(S.mode==='menu'?'solo':S.mode,$('betInput').value);} $('overlay').classList.add('hidden'); };
+$('btnNew').onclick=()=>{ if(S.mode==='online'&&S.myIndex===0){ startGame('online'); netSend({t:'start',bet:0,host:S.names[0]});} else if(S.mode!=='online'){ startGame(S.mode==='menu'?'solo':S.mode);} $('overlay').classList.add('hidden'); };
 $('btnStart').onclick=()=>{ // host starts online game
-  const bet=Math.max(10,Math.min(500,parseInt($('betInput').value)||50));
   S.names[0]=$('nameInput').value||'Host';
-  if(!startGame('online',bet)) return;
-  netSend({t:'start',bet:S.bet,host:S.names[0]});
+  if(!startGame('online')) return;
+  netSend({t:'start',bet:0,host:S.names[0]});
   $('btnStart').classList.add('hidden');
 };
 $('btnAgain').onclick=()=>{ $('overlay').classList.add('hidden'); $('btnNew').click(); };
 $('btnCloseOv').onclick=()=>$('overlay').classList.add('hidden');
 function showRules(){ $('ovTitle').textContent='📜 How to play';
-  $('ovText').innerHTML='1️⃣ <b>Enter a bet</b> — both players stake the same chips, winner takes the pot.<br>2️⃣ <b>4 rerolls per turn</b> — ROLL, then click a die to HOLD it and REROLL the other (max 4 rerolls). Each reroll replaces your turn score — only the dice on the table when you BANK count, so reroll to chase a better number (but you can roll worse too!).<br>3️⃣ <b>First to 100 wins.</b> Doubles give +5 bonus — but <b>snake eyes (1+1) = BUST</b>, you lose the turn!<br><br>🌐 Online: one player hits <b>Create Room</b> and shares the 5-letter code; the other hits <b>Join Room</b> and enters it. Works across networks (P2P).';
+  $('ovText').innerHTML='1️⃣ <b>Free play</b> — no chips while the game is in development, just race to 100 for glory.<br>2️⃣ <b>4 rerolls per turn</b> — ROLL, then click a die to HOLD it and REROLL the other (max 4 rerolls). Each reroll replaces your turn score — only the dice on the table when you BANK count, so reroll to chase a better number (but you can roll worse too!).<br>3️⃣ <b>First to 100 wins.</b> Doubles give +5 bonus — but <b>snake eyes (1+1) = BUST</b>, you lose the turn!<br><br>🌐 Online: one player hits <b>Create Room</b> and shares the 5-letter code; the other hits <b>Join Room</b> and enters it. Works across networks (P2P).';
   $('overlay').classList.remove('hidden'); }
 $('btnHelp').onclick=showRules;
 $('btnRestart').onclick=()=>{ try{$('btnNew').click();}catch(e){} };

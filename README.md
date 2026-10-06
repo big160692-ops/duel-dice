@@ -10,7 +10,7 @@ npx serve .
 Internet needed for the Three.js + PeerJS CDNs.
 
 ## Rules (as requested)
-1. **Enter a bet** — both players stake the same chips (balance starts at 1000, saved in browser). Winner takes the whole pot.
+1. **Free play for now** — betting chips are parked until development is complete. Just race to 100 for glory.
 2. **Only 4 rerolls per turn** — ROLL, then click a die to HOLD it and reroll the other. BANK to keep your turn score. Rerolls reset each turn.
 3. **First to 100 wins** — banked points accumulate; first to 100+ takes the pot.
 
