@@ -40,6 +40,8 @@
   .p.active{border-color:var(--accent); box-shadow:0 0 18px #ffb70366;}
   .p .nm{font-weight:800; font-size:14px;} .p .tot{font-size:28px; font-weight:900;} .p .sub{font-size:12px; opacity:.85;}
   #turnInfo{font-size:14px; min-height:40px;}
+  #turnTotal{font-size:22px; font-weight:900; text-align:center; color:var(--accent);
+    background:#0007; border:1px solid #ffffff22; border-radius:10px; padding:8px; margin:6px 0;}
   #log{height:130px; overflow-y:auto; font-size:12.5px; background:#0007; border-radius:10px; padding:8px;}
   #log div{margin:2px 0; border-bottom:1px solid #ffffff0d; padding-bottom:2px;}
   #roomCode{font-size:26px; letter-spacing:4px; font-weight:900; color:var(--accent); text-align:center;
@@ -145,6 +147,7 @@
         <div class="p" id="p1"><div class="nm" id="n1">Opponent</div><div class="tot" id="t1">0</div><div class="sub" id="s1">turn: 0 • rerolls: 4</div></div>
       </div>
       <p id="turnInfo">Set a bet and start a game.</p>
+      <div id="turnTotal">TURN TOTAL: –</div>
       <div>
         <button id="btnRoll">🎲 ROLL</button>
         <button id="btnBank" class="secondary">💰 BANK</button>
@@ -184,7 +187,7 @@
   </div>
 </div>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally</footer>
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v5</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -227,6 +230,7 @@ function paint(){
   $('btnRoll').disabled = S.rolling || !(S.canPlay && !S.over && myTurn && (!S.hasRolled || S.rollsLeft>0) && !(S.locked[0]&&S.locked[1]&&S.hasRolled));
   $('btnBank').disabled = S.rolling || !(S.canPlay && !S.over && myTurn && S.hasRolled);
   $('btnRoll').textContent = S.rolling ? '🎲 ROLLING…' : (!S.hasRolled ? '🎲 ROLL' : `🎲 REROLL (${S.rollsLeft} left)`);
+  $('turnTotal').textContent = S.canPlay ? `${S.names[S.turn].toUpperCase()}'S TURN TOTAL: ${S.turnScore}` : 'TURN TOTAL: –';
 }
 
 /* ================= 3D DICE ================= */
