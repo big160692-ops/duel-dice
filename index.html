@@ -34,8 +34,10 @@
   #setupBox{background:var(--panel); border-radius:20px; padding:28px 24px; max-width:400px; width:100%; text-align:center; border:1px solid #ffffff2a; box-shadow:0 24px 80px #000c;}
   #setupBox h2{margin:0 0 10px; color:var(--accent);}
   #setupBox label{display:block; font-size:12px; text-align:left; opacity:.8; margin-top:6px;}
-  #btnLogs{position:fixed; right:12px; bottom:12px; z-index:40; width:52px; height:52px; border-radius:50%;
+  #btnLogs,#btnHelp,#btnRestart{position:fixed; right:12px; z-index:40; width:52px; height:52px; border-radius:50%;
     font-size:22px; padding:0; margin:0; min-height:0; background:#ffffff22; color:#fff; border:1px solid #ffffff33;}
+  #btnLogs{bottom:12px;} #btnHelp{bottom:76px;} #btnRestart{bottom:140px;}
+  #menuCard,#betCard,#playCard{display:none;}
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; display:flex; flex-direction:column;
     justify-content:space-between; padding:10px;}
   #hudBottom{display:flex; flex-direction:column; align-items:center; gap:6px;}
@@ -164,7 +166,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="betCard">
       <h3>💰 BET</h3>
       <div class="row">
         <input id="betInput" type="number" min="10" max="500" value="50" />
@@ -174,7 +176,7 @@
       <div style="font-size:12px; opacity:.75">Both players bet the same amount. Winner takes the whole pot.</div>
     </div>
 
-    <div class="card">
+    <div class="card" id="playCard">
       <h3>🎲 PLAY (RACE TO 100)</h3>
       <div>
         <button id="btnNew" class="ghost">↺ New round</button>
@@ -226,8 +228,10 @@
 </div>
 
 <button id="btnLogs" title="Toggle log (F7)">📜</button>
+<button id="btnHelp" title="How to play">❓</button>
+<button id="btnRestart" title="New round">↺</button>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v8</span></footer>
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v9</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -806,9 +810,11 @@ $('btnStart').onclick=()=>{ // host starts online game
 };
 $('btnAgain').onclick=()=>{ $('overlay').classList.add('hidden'); $('btnNew').click(); };
 $('btnCloseOv').onclick=()=>$('overlay').classList.add('hidden');
-$('btnRules').onclick=()=>{ $('ovTitle').textContent='📜 How to play';
+function showRules(){ $('ovTitle').textContent='📜 How to play';
   $('ovText').innerHTML='1️⃣ <b>Enter a bet</b> — both players stake the same chips, winner takes the pot.<br>2️⃣ <b>4 rerolls per turn</b> — ROLL, then click a die to HOLD it and REROLL the other (max 4 rerolls). Each reroll replaces your turn score — only the dice on the table when you BANK count, so reroll to chase a better number (but you can roll worse too!).<br>3️⃣ <b>First to 100 wins.</b> Doubles give +5 bonus — but <b>snake eyes (1+1) = BUST</b>, you lose the turn!<br><br>🌐 Online: one player hits <b>Create Room</b> and shares the 5-letter code; the other hits <b>Join Room</b> and enters it. Works across networks (P2P).';
-  $('overlay').classList.remove('hidden'); };
+  $('overlay').classList.remove('hidden'); }
+$('btnHelp').onclick=showRules;
+$('btnRestart').onclick=()=>{ try{$('btnNew').click();}catch(e){} };
 
 init3D(); paint();
 log('👋 Welcome! Pick <b>Solo vs AI</b> for a quick game, or <b>Create/Join Room</b> to play online with a code.');
