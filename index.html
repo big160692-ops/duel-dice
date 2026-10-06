@@ -280,7 +280,7 @@ function init3D(){
   die1=makeDie(-1.3); die2=makeDie(1.3);
   die1.quaternion.copy(targetQuat(1)); die2.quaternion.copy(targetQuat(1));
   renderer.shadowMap.enabled=true;
-  (function loop(){requestAnimationFrame(loop); if(!animating){die1.rotation.y+=.0015; die2.rotation.y-=.0015;} renderer.render(scene,camera);})();
+  (function loop(){requestAnimationFrame(loop); renderer.render(scene,camera);})();
   resize();
   // click dice to hold
   const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
@@ -296,34 +296,75 @@ function init3D(){
   });
 }
 function rollAnim(d1v,d2v,done){
+  // Realistic throw: each die is tossed from the player's side of the table,
+  // tumbles with gravity, bounces on the felt (losing energy each bounce),
+  // then settles flat so the rolled face reads clearly on top.
   animating=true;
   const dice=[{m:die1,v:d1v},{m:die2,v:d2v}];
-  const T0=performance.now(), DUR=1100;
-  const startQ=dice.map(d=>d.m.quaternion.clone());
-  const randQ=dice.map(()=>new THREE.Quaternion().setFromEuler(new THREE.Euler(rand(0,6),rand(0,6),rand(0,6))));
-  const endQ=dice.map(d=>targetQuat(d.v));
-  const sx=dice.map(d=>d.m.position.x);
-  // Separated landing zones (left die stays left, right die stays right)
-  // so the two dice can never land on top of each other / look merged.
-  const ex=[-(0.9+Math.random()*1.4), 0.9+Math.random()*1.4];
-  const ez=[(Math.random()*1.2-0.6),(Math.random()*1.2-0.6)];
+  const REST=0.8, GRAV=-14, DUR=1500, T0=performance.now();
+  dice.forEach((d,i)=>{
+    d.delay=i*140; // slight stagger, like throwing two dice
+    d.p=new THREE.Vector3((Math.random()*2-1)*1.2, 4.5+Math.random()*2, 3.2+Math.random()*0.8);
+    d.v=new THREE.Vector3((Math.random()*2-1)*2.4, 1.0+Math.random()*1.6, -(3.5+Math.random()*2.5));
+    d.av=new THREE.Vector3((Math.random()<.5?-1:1)*(6+Math.random()*7),(Math.random()*10-5),(Math.random()*10-5));
+    d.m.quaternion.setFromEuler(new THREE.Euler(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28));
+    d.m.position.copy(d.p);
+    d.endQ=targetQuat(d.v);
+    d.ex= i===0 ? -(0.9+Math.random()*1.4) : 0.9+Math.random()*1.4; // separated landing zones
+    d.ez=(Math.random()*1.6-0.8);
+    d.bounced=0; d.q0=null;
+  });
+  let last=T0;
   function frame(t){
-    const k=Math.min(1,(t-T0)/DUR);
-    const e=1-Math.pow(1-k,3);
-    dice.forEach((d,i)=>{
-      // fly up then land
-      const h=Math.sin(k*Math.PI)*(2.2+Math.random()*.3);
-      d.m.position.x=sx[i]+(ex[i]-sx[i])*e;
-      d.m.position.y=.8+h;
-      d.m.position.z=ez[i]*e+Math.sin(k*Math.PI*2+i)*.8*(1-e);
-      if(k<.65){ d.m.quaternion.slerpQuaternions(startQ[i],randQ[i],k/.65); d.m.rotateX(.35); d.m.rotateY(.3); }
-      else { d.m.quaternion.slerpQuaternions(randQ[i],endQ[i],(k-.65)/.35); }
+    const dt=Math.min(0.033,Math.max(0.001,(t-last)/1000)); last=t;
+    let allDone=true;
+    dice.forEach((d)=>{
+      const lt=t-T0-d.delay;
+      if(lt<0){ allDone=false; return; }
+      const k=lt/DUR;
+      if(k>=1){
+        d.m.quaternion.copy(d.endQ);
+        d.m.position.set(d.ex,REST,d.ez);
+        return;
+      }
+      allDone=false;
+      const settle=Math.max(0,(k-0.70)/0.30); // final phase: ease into exact readable pose
+      if(settle<=0){
+        d.v.y+=GRAV*dt;
+        d.p.addScaledVector(d.v,dt);
+        if(d.p.y<REST){
+          d.p.y=REST;
+          if(Math.abs(d.v.y)>1.2 && d.bounced<4){
+            d.v.y=-d.v.y*(0.36+Math.random()*0.12); // bounce
+            d.v.x*=0.72; d.v.z*=0.72;
+            d.av.multiplyScalar(0.6);
+            d.bounced++;
+            blip(170+Math.random()*150+d.bounced*50);
+          } else { // rolling out: heavy friction
+            d.v.y=0;
+            const f=Math.max(0,1-3*dt);
+            d.v.x*=f; d.v.z*=f;
+            d.av.multiplyScalar(Math.max(0,1-2.4*dt));
+          }
+        }
+        if(Math.abs(d.p.x)>3.0){ d.p.x=Math.sign(d.p.x)*3.0; d.v.x*=-0.5; } // felt edges
+        if(d.p.z<-2.6){ d.p.z=-2.6; d.v.z*=-0.5; }
+        if(d.p.z>4.4){ d.p.z=4.4; d.v.z*=-0.5; }
+        const w=d.av.clone().multiplyScalar(dt), ang=w.length(); // tumble
+        if(ang>1e-4) d.m.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(w.normalize(),ang));
+        d.m.position.copy(d.p);
+      } else {
+        const e=settle*settle*(3-2*settle);
+        if(!d.q0) d.q0=d.m.quaternion.clone();
+        d.m.position.lerpVectors(d.p,new THREE.Vector3(d.ex,REST,d.ez),e);
+        d.m.quaternion.slerpQuaternions(d.q0,d.endQ,e);
+      }
     });
-    if(k<1) requestAnimationFrame(frame);
-    else { dice.forEach((d,i)=>{d.m.quaternion.copy(endQ[i]); d.m.position.set(ex[i],.8,ez[i]);}); animating=false; done&&done(); }
+    if(!allDone) requestAnimationFrame(frame);
+    else { animating=false; done&&done(); }
   }
   requestAnimationFrame(frame);
-  blip(300+Math.random()*300);
+  blip(280+Math.random()*200);
 }
 let AC=null;
 function blip(f){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
