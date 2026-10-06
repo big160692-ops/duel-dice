@@ -504,10 +504,14 @@ function doRoll(){
       if(S.mode==='online') netSend({t:'roll',dice:nd,locked:S.locked,rollsLeft:S.rollsLeft,turnScore:0,bust:true});
       return;
     }
-    S.turnScore+=sum;
+    // Only freshly-thrown dice add points — a held die already put its value
+    // into the turn score when first rolled, so it must not count again.
+    const fresh=nd.reduce((a,v,i)=>a+(holds[i]?0:v),0);
+    S.turnScore+=fresh;
     let bonus='';
     if(nd[0]===nd[1]){ S.turnScore+=5; bonus=' (+5 doubles bonus!)'; }
-    log(`🎲 ${S.names[S.turn]} rolled ${nd[0]}+${nd[1]}=${sum}${bonus} → turn total ${S.turnScore}`);
+    const show=nd.map((v,i)=>holds[i]?`${v}(held)`:String(v)).join(' + ');
+    log(`🎲 ${S.names[S.turn]} rolled ${show} = ${sum} → +${fresh}${bonus} → turn total ${S.turnScore}`);
     $('turnInfo').textContent=`${turnLabel()}: turn score ${S.turnScore} • rerolls left ${S.rollsLeft}. BANK or REROLL (click die to hold).`;
     paint();
     if(S.mode==='online') netSend({t:'roll',dice:nd,locked:S.locked,rollsLeft:S.rollsLeft,turnScore:S.turnScore});
@@ -699,7 +703,7 @@ $('btnStart').onclick=()=>{ // host starts online game
 $('btnAgain').onclick=()=>{ $('overlay').classList.add('hidden'); $('btnNew').click(); };
 $('btnCloseOv').onclick=()=>$('overlay').classList.add('hidden');
 $('btnRules').onclick=()=>{ $('ovTitle').textContent='📜 How to play';
-  $('ovText').innerHTML='1️⃣ <b>Enter a bet</b> — both players stake the same chips, winner takes the pot.<br>2️⃣ <b>4 rerolls per turn</b> — ROLL, then click a die to HOLD it and REROLL the other (max 4 rerolls). BANK to keep your turn score.<br>3️⃣ <b>First to 100 wins.</b> Doubles give +5 bonus — but <b>snake eyes (1+1) = BUST</b>, you lose the turn!<br><br>🌐 Online: one player hits <b>Create Room</b> and shares the 5-letter code; the other hits <b>Join Room</b> and enters it. Works across networks (P2P).';
+  $('ovText').innerHTML='1️⃣ <b>Enter a bet</b> — both players stake the same chips, winner takes the pot.<br>2️⃣ <b>4 rerolls per turn</b> — ROLL, then click a die to HOLD it and REROLL the other (max 4 rerolls). BANK to keep your turn score. Only dice you throw score points — a held die keeps the points it already earned and is not counted again.<br>3️⃣ <b>First to 100 wins.</b> Doubles give +5 bonus — but <b>snake eyes (1+1) = BUST</b>, you lose the turn!<br><br>🌐 Online: one player hits <b>Create Room</b> and shares the 5-letter code; the other hits <b>Join Room</b> and enters it. Works across networks (P2P).';
   $('overlay').classList.remove('hidden'); };
 
 init3D(); paint();
