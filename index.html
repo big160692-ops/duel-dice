@@ -154,7 +154,7 @@
         <button id="btnNew" class="ghost">↺ New round</button>
         <button id="btnRules" class="ghost">📜 Rules</button>
       </div>
-      <div style="font-size:12px;">Last roll: <b id="lastRoll">–</b> <span id="holdInfo"></span></div>
+      <div style="font-size:12px;">Latest throw: <b id="lastRoll">–</b> <span id="holdInfo"></span></div>
     </div>
 
     <div class="card">
@@ -223,7 +223,7 @@ function paint(){
     $('s'+p).textContent = `turn: ${S.turn===i?S.turnScore:0} • rerolls: ${S.turn===i?S.rollsLeft:4}`;
     $('p'+p).classList.toggle('active',S.canPlay&&S.turn===i);
   }
-  $('lastRoll').textContent = S.rolling ? '🎲 rolling…' : (S.hasRolled ? `${S.dice[0]} + ${S.dice[1]} = ${S.dice[0]+S.dice[1]} (turn ${S.turnScore})` : '–');
+  $('lastRoll').textContent = S.rolling ? '🎲 rolling…' : (S.hasRolled ? `dice ${S.dice[0]} + ${S.dice[1]} = ${S.dice[0]+S.dice[1]} → turn total ${S.turnScore}` : '–');
   $('holdInfo').innerHTML = (!S.rolling && S.hasRolled) ? ` &nbsp; ${S.locked[0]?'<span class="holdTag">DIE 1 HELD</span>':''} ${S.locked[1]?'<span class="holdTag">DIE 2 HELD</span>':''}` : '';
   paintBal();
   const myTurn = isMyTurn();
