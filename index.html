@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DICE RACE 100 — 3D Multiplayer Dice</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.3/dist/peerjs.min.js"></script>
+<style>
+  :root{ --bg:#0b1020; --panel:#151c33; --accent:#ffb703; --accent2:#219ebc; --good:#80ed99; --bad:#ff595e; }
+  *{box-sizing:border-box; font-family:'Segoe UI',system-ui,Arial,sans-serif;}
+  body{margin:0; background:radial-gradient(1200px 700px at 50% -10%,#1d2a55,#0b1020); color:#fff; min-height:100vh;}
+  header{text-align:center; padding:14px 10px 4px;}
+  header h1{margin:0; letter-spacing:2px; font-size:clamp(22px,4vw,38px);}
+  header h1 span{color:var(--accent);}
+  header p{margin:4px 0 0; opacity:.8; font-size:14px;}
+  #app{display:flex; gap:14px; max-width:1200px; margin:10px auto; padding:0 12px 30px; flex-wrap:wrap;}
+  #tableWrap{flex:2 1 560px; min-width:300px; position:relative; border-radius:18px; overflow:hidden;
+    background:linear-gradient(180deg,#0e5c46,#07352a); border:2px solid #ffffff22; box-shadow:0 20px 60px #0008; min-height:440px;}
+  #c3d{width:100%; height:480px; display:block; cursor:pointer;}
+  #diceHint{position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:13px; opacity:.9;
+    background:#0007; padding:6px; pointer-events:none;}
+  #side{flex:1 1 300px; min-width:290px; background:var(--panel); border-radius:18px; padding:16px; border:1px solid #ffffff18;}
+  .card{background:#ffffff0d; border:1px solid #ffffff14; border-radius:12px; padding:12px; margin-bottom:12px;}
+  .card h3{margin:0 0 8px; font-size:15px; letter-spacing:1px; color:var(--accent);}
+  button{background:var(--accent); border:0; color:#111; font-weight:700; padding:10px 14px; border-radius:10px;
+    cursor:pointer; margin:4px 4px 4px 0; transition:.15s;}
+  button:hover{filter:brightness(1.1); transform:translateY(-1px);}
+  button:disabled{opacity:.35; cursor:not-allowed; transform:none;}
+  button.secondary{background:#8ecae6;} button.ghost{background:#ffffff18; color:#fff;} button.danger{background:var(--bad); color:#fff;}
+  input,select{background:#0b1020; border:1px solid #ffffff2c; color:#fff; padding:10px; border-radius:10px; width:100%; margin:4px 0;}
+  .row{display:flex; gap:8px;} .row>*{flex:1;}
+  #players{display:flex; gap:10px;}
+  .p{flex:1; background:#0006; border-radius:12px; padding:10px; text-align:center; border:2px solid transparent;}
+  .p.active{border-color:var(--accent); box-shadow:0 0 18px #ffb70366;}
+  .p .nm{font-weight:800; font-size:14px;} .p .tot{font-size:28px; font-weight:900;} .p .sub{font-size:12px; opacity:.85;}
+  #turnInfo{font-size:14px; min-height:40px;}
+  #log{height:130px; overflow-y:auto; font-size:12.5px; background:#0007; border-radius:10px; padding:8px;}
+  #log div{margin:2px 0; border-bottom:1px solid #ffffff0d; padding-bottom:2px;}
+  #roomCode{font-size:26px; letter-spacing:4px; font-weight:900; color:var(--accent); text-align:center;
+    background:#0008; border-radius:10px; padding:8px; border:1px dashed var(--accent);}
+  .pill{display:inline-block; background:var(--accent2); border-radius:20px; padding:2px 10px; font-size:12px; font-weight:700;}
+  #menu{display:flex; flex-direction:column; gap:6px;}
+  .hidden{display:none !important;}
+  #overlay{position:fixed; inset:0; background:#000c; display:flex; align-items:center; justify-content:center; z-index:10; padding:16px;}
+  #overlayBox{background:var(--panel); border-radius:18px; padding:26px; max-width:480px; width:100%; text-align:center; border:1px solid #ffffff22;}
+  #overlayBox h2{margin-top:0; color:var(--accent);}
+  footer{text-align:center; opacity:.6; font-size:12px; padding-bottom:20px;}
+  .holdTag{font-size:11px; background:var(--accent2); border-radius:6px; padding:1px 6px;}
+  #waitOverlay{position:fixed; inset:0; background:#050816ee; display:flex; align-items:center; justify-content:center; z-index:20; padding:16px; backdrop-filter:blur(4px);}
+  #waitBox{background:var(--panel); border-radius:20px; padding:32px 28px; max-width:420px; width:100%; text-align:center; border:1px solid #ffffff2a; box-shadow:0 24px 80px #000c;}
+  .spinner{width:64px; height:64px; margin:6px auto 14px; border-radius:50%; border:5px solid #ffffff22; border-top-color:var(--accent); animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #waitCode{font-size:34px; letter-spacing:6px; font-weight:900; color:var(--accent); background:#0008; border-radius:12px; padding:10px; border:2px dashed var(--accent); margin:10px 0;}
+  #waitStatus{font-size:14px; min-height:22px; margin:8px 0;}
+  #waitStatus .dots::after{content:''; animation:dots 1.2s steps(4) infinite;}
+  @keyframes dots{0%{content:'';}25%{content:'.';}50%{content:'..';}75%{content:'...';}}
+  .pulse{animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+  @media(max-width:800px){ #c3d{height:360px;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎲 DICE RACE <span>100</span></h1>
+  <p>Bet chips • 4 rerolls per turn • First to <b>100</b> wins the pot — play solo, local, or online with a room code</p>
+</header>
+
+<div id="app">
+  <div id="tableWrap">
+    <canvas id="c3d"></canvas>
+    <div id="diceHint">Click a die (after first roll) to HOLD / UNHOLD it • doubles of 1 = BUST!</div>
+  </div>
+
+  <div id="side">
+    <div class="card" id="menuCard">
+      <h3>1 — CHOOSE MODE</h3>
+      <div id="menu">
+        <div class="row">
+          <button id="btnSolo">🤖 Solo vs AI</button>
+          <button id="btnLocal" class="secondary">👥 Local 2P</button>
+        </div>
+        <div class="row">
+          <button id="btnHost">🌐 Create Room</button>
+          <button id="btnJoinBtn" class="secondary">🔑 Join Room</button>
+        </div>
+        <div id="joinRow" class="hidden">
+          <input id="joinCode" placeholder="Enter room code e.g. K7Q2M" maxlength="12" />
+          <input id="myName" placeholder="Your name" maxlength="14" value="Player2" />
+          <button id="btnJoinGo">Connect</button>
+        </div>
+        <div id="hostInfo" class="hidden">
+          <div>Share this code with a friend:</div>
+          <div id="roomCode">-----</div>
+          <div style="font-size:12px; opacity:.8" id="netStatus">Waiting for opponent…</div>
+          <div class="row">
+            <button id="btnCopy" class="ghost">Copy code</button>
+            <button id="btnCancelHost" class="danger">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>2 — ENTER A BET</h3>
+      <div class="row">
+        <input id="betInput" type="number" min="10" max="500" value="50" />
+        <input id="nameInput" placeholder="Your name" maxlength="14" value="Player1" />
+      </div>
+      <div style="font-size:13px;">Balance: <b id="balance">1000</b> chips • Pot: <b id="pot">0</b> <button id="btnStart" class="hidden">▶ START GAME</button></div>
+      <div style="font-size:12px; opacity:.75">Both players bet the same amount. Winner takes the whole pot.</div>
+    </div>
+
+    <div class="card">
+      <h3>3 — PLAY (RACE TO 100)</h3>
+      <div id="players">
+        <div class="p" id="p0"><div class="nm" id="n0">You</div><div class="tot" id="t0">0</div><div class="sub" id="s0">turn: 0 • rerolls: 4</div></div>
+        <div class="p" id="p1"><div class="nm" id="n1">Opponent</div><div class="tot" id="t1">0</div><div class="sub" id="s1">turn: 0 • rerolls: 4</div></div>
+      </div>
+      <p id="turnInfo">Set a bet and start a game.</p>
+      <div>
+        <button id="btnRoll">🎲 ROLL</button>
+        <button id="btnBank" class="secondary">💰 BANK</button>
+        <button id="btnNew" class="ghost">↺ New round</button>
+        <button id="btnRules" class="ghost">📜 Rules</button>
+      </div>
+      <div style="font-size:12px;">Last roll: <b id="lastRoll">–</b> <span id="holdInfo"></span></div>
+    </div>
+
+    <div class="card">
+      <h3>GAME LOG <span class="pill" id="modePill">offline</span></h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="hidden">
+  <div id="overlayBox">
+    <h2 id="ovTitle">You win!</h2>
+    <p id="ovText"></p>
+    <button id="btnAgain">Play again</button>
+    <button id="btnCloseOv" class="ghost">Close</button>
+  </div>
+</div>
+
+<div id="waitOverlay" class="hidden">
+  <div id="waitBox">
+    <div class="spinner" id="waitSpinner"></div>
+    <h2 id="waitTitle" style="margin:0;color:var(--accent)">Waiting for opponent…</h2>
+    <div style="font-size:13px; opacity:.85; margin-top:6px;">Share this room code with your friend:</div>
+    <div id="waitCode">-----</div>
+    <div id="waitStatus" class="pulse">Opening room<span class="dots"></span></div>
+    <div class="row">
+      <button id="btnWaitCopy" class="secondary">📋 Copy code</button>
+      <button id="btnWaitCancel" class="danger">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally</footer>
+
+<script>
+/* ================= STATE ================= */
+const $ = id => document.getElementById(id);
+const log = m => { const d=document.createElement('div'); d.innerHTML=m; $('log').prepend(d); };
+const rand = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const CODE_CHARS='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+let S = {
+  mode:'menu', // solo | local | online
+  names:['You','Opponent'],
+  totals:[0,0], turnScore:0, dice:[1,1], locked:[false,false],
+  rollsLeft:4, hasRolled:false, turn:0, myIndex:0,
+  bet:50, pot:0, over:false, canPlay:false,
+  balance: parseInt(localStorage.getItem('dice100_balance')||'1000',10)
+};
+function saveBal(){ localStorage.setItem('dice100_balance', S.balance); }
+function paintBal(){ $('balance').textContent=S.balance; $('pot').textContent=S.pot; }
+paintBal();
+
+function setNames(){ S.names[0]=$('nameInput').value||'Player1';
+  if(S.mode==='online'){} else if(S.mode==='solo'){S.names=['You','AI 🤖'];} else if(S.mode==='local'){S.names=[$('nameInput').value||'P1','P2'];}
+  $('n0').textContent=S.names[0]; $('n1').textContent=S.names[1];
+}
+function paint(){
+  $('t0').textContent=S.totals[0]; $('t1').textContent=S.totals[1];
+  $('s0').textContent=`turn: ${S.turn===0?S.turnScore:0} • rerolls: ${S.turn===0?S.rollsLeft:4}`;
+  $('s1').textContent=`turn: ${S.turn===1?S.turnScore:0} • rerolls: ${S.turn===1?S.rollsLeft:4}`;
+  $('p0').classList.toggle('active',S.canPlay&&S.turn===0);
+  $('p1').classList.toggle('active',S.canPlay&&S.turn===1);
+  $('lastRoll').textContent = S.hasRolled ? `${S.dice[0]} + ${S.dice[1]} = ${S.dice[0]+S.dice[1]} (turn ${S.turnScore})` : '–';
+  $('holdInfo').innerHTML = S.hasRolled ? ` &nbsp; ${S.locked[0]?'<span class="holdTag">DIE 1 HELD</span>':''} ${S.locked[1]?'<span class="holdTag">DIE 2 HELD</span>':''}` : '';
+  paintBal();
+  const myTurn = isMyTurn();
+  $('btnRoll').disabled = !(S.canPlay && !S.over && myTurn && (!S.hasRolled || S.rollsLeft>0) && !(S.locked[0]&&S.locked[1]&&S.hasRolled));
+  $('btnBank').disabled = !(S.canPlay && !S.over && myTurn && S.hasRolled);
+  $('btnRoll').textContent = !S.hasRolled ? '🎲 ROLL' : `🎲 REROLL (${S.rollsLeft} left)`;
+}
+
+/* ================= 3D DICE ================= */
+let scene,camera,renderer,die1,die2,animating=false;
+function pipTexture(v){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const g=c.getContext('2d');
+  g.fillStyle='#f8f9fa'; g.fillRect(0,0,256,256);
+  g.strokeStyle='#ddd'; g.lineWidth=10; g.strokeRect(5,5,246,246);
+  g.fillStyle='#111';
+  const P={1:[[128,128]],2:[[70,70],[186,186]],3:[[70,70],[128,128],[186,186]],
+    4:[[70,70],[186,70],[70,186],[186,186]],5:[[70,70],[186,70],[128,128],[70,186],[186,186]],
+    6:[[70,70],[186,70],[70,128],[186,128],[70,186],[186,186]]}[v];
+  P.forEach(([x,y])=>{g.beginPath();g.arc(x,y,v===1?34:26,0,7);g.fill();
+    if(v===1){g.fillStyle='#c1121f';g.fill();g.fillStyle='#111';}});
+  const t=new THREE.CanvasTexture(c); return t;
+}
+function makeDie(x){
+  const mats=[1,6,2,5,3,4].map(v=>new THREE.MeshStandardMaterial({map:pipTexture(v),roughness:.35,metalness:.05}));
+  const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.6,1.6),mats);
+  m.position.set(x,1.2,0); m.castShadow=true; scene.add(m); return m;
+}
+// target orientation so value V is on TOP (+y)
+function targetQuat(v){
+  const e=new THREE.Euler(0,0,0);
+  if(v===2){e.set(0,rand(0,3)*Math.PI/2,0);}
+  else if(v===5){e.set(Math.PI,rand(0,3)*Math.PI/2,0);}
+  else if(v===1){e.set(0,0,-Math.PI/2); }
+  else if(v===6){e.set(0,0,Math.PI/2);}
+  else if(v===3){e.set(-Math.PI/2,0,0);}
+  else if(v===4){e.set(Math.PI/2,0,0);}
+  const q=new THREE.Quaternion().setFromEuler(e);
+  const spin=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), rand(0,3)*Math.PI/2);
+  return spin.multiply(q);
+}
+function init3D(){
+  scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x07352a,12,26);
+  camera=new THREE.PerspectiveCamera(45,1,0.1,100); camera.position.set(0,6.2,7.2); camera.lookAt(0,0,0);
+  renderer=new THREE.WebGLRenderer({canvas:$('c3d'),antialias:true,alpha:true});
+  const resize=()=>{const w=$('tableWrap').clientWidth; renderer.setSize(w,window.innerWidth<800?360:480,false); camera.aspect=w/(window.innerWidth<800?360:480); camera.updateProjectionMatrix();};
+  window.addEventListener('resize',resize);
+  scene.add(new THREE.AmbientLight(0xffffff,.75));
+  const key=new THREE.DirectionalLight(0xffffff,.9); key.position.set(4,9,5); key.castShadow=true; scene.add(key);
+  const rim=new THREE.DirectionalLight(0xffb703,.4); rim.position.set(-5,4,-5); scene.add(rim);
+  const felt=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x0a6b4f,roughness:1}));
+  felt.rotation.x=-Math.PI/2; felt.receiveShadow=true; scene.add(felt);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(4.4,.12,12,80),new THREE.MeshStandardMaterial({color:0x8b5a2b,roughness:.5}));
+  ring.rotation.x=Math.PI/2; ring.position.y=.05; scene.add(ring);
+  die1=makeDie(-1.3); die2=makeDie(1.3);
+  die1.quaternion.copy(targetQuat(1)); die2.quaternion.copy(targetQuat(1));
+  renderer.shadowMap.enabled=true;
+  (function loop(){requestAnimationFrame(loop); if(!animating){die1.rotation.y+=.0015; die2.rotation.y-=.0015;} renderer.render(scene,camera);})();
+  resize();
+  // click dice to hold
+  const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
+  $('c3d').addEventListener('click',ev=>{
+    if(!S.canPlay||!isMyTurn()||!S.hasRolled||animating) return;
+    const r=renderer.domElement.getBoundingClientRect();
+    mouse.x=((ev.clientX-r.left)/r.width)*2-1; mouse.y=-((ev.clientY-r.top)/r.height)*2+1;
+    ray.setFromCamera(mouse,camera);
+    const hit=ray.intersectObjects([die1,die2])[0];
+    if(!hit) return;
+    const i = hit.object===die1?0:1;
+    toggleHold(i);
+  });
+}
+function rollAnim(d1v,d2v,done){
+  animating=true;
+  const dice=[{m:die1,v:d1v},{m:die2,v:d2v}];
+  const T0=performance.now(), DUR=1100;
+  const startQ=dice.map(d=>d.m.quaternion.clone());
+  const randQ=dice.map(()=>new THREE.Quaternion().setFromEuler(new THREE.Euler(rand(0,6),rand(0,6),rand(0,6))));
+  const endQ=dice.map(d=>targetQuat(d.v));
+  const sx=[-1.3,1.3], ex=[rand(-22,22)/10,rand(-22,22)/10];
+  function frame(t){
+    const k=Math.min(1,(t-T0)/DUR);
+    const e=1-Math.pow(1-k,3);
+    dice.forEach((d,i)=>{
+      // fly up then land
+      const h=Math.sin(k*Math.PI)*(2.2+Math.random()*.3);
+      d.m.position.x=sx[i]+(ex[i]-sx[i])*e;
+      d.m.position.y=.8+h;
+      d.m.position.z=Math.sin(k*Math.PI*2+i)*.6;
+      if(k<.65){ d.m.quaternion.slerpQuaternions(startQ[i],randQ[i],k/.65); d.m.rotateX(.35); d.m.rotateY(.3); }
+      else { d.m.quaternion.slerpQuaternions(randQ[i],endQ[i],(k-.65)/.35); }
+    });
+    if(k<1) requestAnimationFrame(frame);
+    else { dice.forEach((d,i)=>{d.m.quaternion.copy(endQ[i]); d.m.position.set(ex[i],.8,0);}); animating=false; done&&done(); }
+  }
+  requestAnimationFrame(frame);
+  blip(300+Math.random()*300);
+}
+let AC=null;
+function blip(f){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  const o=AC.createOscillator(),g=AC.createGain(); o.frequency.value=f; o.type='triangle';
+  g.gain.setValueAtTime(.12,AC.currentTime); g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.18);
+  o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+.2);}catch(e){} }
+
+/* ================= GAME LOGIC ================= */
+function isMyTurn(){
+  if(!S.canPlay) return false;
+  if(S.mode==='solo') return S.turn===0;
+  if(S.mode==='local') return true;
+  if(S.mode==='online') return S.turn===S.myIndex;
+  return false;
+}
+function turnLabel(){ return `${S.names[S.turn]}'s turn`; }
+
+function startGame(mode,bet){
+  bet=Math.max(10,Math.min(500,parseInt(bet)||50));
+  if(S.balance<bet){ log('❌ Not enough balance for that bet.'); return false; }
+  S.mode=mode; setNames();
+  S.bet=bet; S.pot=bet*2; S.balance-=bet; saveBal();
+  S.totals=[0,0]; S.turnScore=0; S.dice=[1,1]; S.locked=[false,false];
+  S.rollsLeft=4; S.hasRolled=false; S.turn=0; S.over=false; S.canPlay=true;
+  $('modePill').textContent = mode==='solo'?'solo vs AI':mode==='local'?'local 2P':'online';
+  log(`🃏 New game — mode <b>${mode}</b>, bet <b>${bet}</b>, pot <b>${S.pot}</b>. ${turnLabel()} rolls first.`);
+  $('turnInfo').textContent = `${turnLabel()} — press ROLL. (4 rerolls available)`;
+  paint();
+  return true;
+}
+
+function doRoll(){
+  if(!S.canPlay||S.over||!isMyTurn()||animating) return;
+  if(S.hasRolled && S.rollsLeft<=0) return;
+  // roll only unlocked dice
+  const nd = S.dice.map((d,i)=> S.hasRolled&&S.locked[i] ? d : rand(1,6));
+  if(S.hasRolled) S.rollsLeft--;
+  S.hasRolled=true; S.dice=nd;
+  const sum=nd[0]+nd[1];
+  paint();
+  rollAnim(nd[0],nd[1],()=>{
+    if(nd[0]===1&&nd[1]===1){
+      S.turnScore=0;
+      log(`💥 <b>${S.names[S.turn]}</b> rolled <b>snake eyes (1+1)</b> — BUST! Turn score lost.`);
+      $('turnInfo').textContent=`${S.names[S.turn]} BUSTED with snake eyes! Turn passes.`;
+      paint();
+      setTimeout(endTurn,1400);
+      if(S.mode==='online') netSend({t:'roll',dice:nd,locked:S.locked,rollsLeft:S.rollsLeft,turnScore:0,bust:true});
+      return;
+    }
+    S.turnScore+=sum;
+    let bonus='';
+    if(nd[0]===nd[1]){ S.turnScore+=5; bonus=' (+5 doubles bonus!)'; }
+    log(`🎲 ${S.names[S.turn]} rolled ${nd[0]}+${nd[1]}=${sum}${bonus} → turn total ${S.turnScore}`);
+    $('turnInfo').textContent=`${turnLabel()}: turn score ${S.turnScore} • rerolls left ${S.rollsLeft}. BANK or REROLL (click die to hold).`;
+    paint();
+    if(S.mode==='online') netSend({t:'roll',dice:nd,locked:S.locked,rollsLeft:S.rollsLeft,turnScore:S.turnScore});
+    if(S.mode==='solo'&&S.turn===1) setTimeout(aiMove,1200);
+  });
+}
+
+function toggleHold(i){
+  if(!S.canPlay||S.over||!isMyTurn()||!S.hasRolled) return;
+  S.locked[i]=!S.locked[i];
+  blip(S.locked[i]?600:400);
+  log(`${S.locked[i]?'🔒':'🔓'} ${S.names[S.turn]} ${S.locked[i]?'held':'released'} die ${i+1} (${S.dice[i]})`);
+  paint();
+  if(S.mode==='online') netSend({t:'hold',locked:S.locked});
+}
+
+function bank(){
+  if(!S.canPlay||S.over||!isMyTurn()||!S.hasRolled) return;
+  S.totals[S.turn]+=S.turnScore;
+  log(`💰 ${S.names[S.turn]} BANKED ${S.turnScore} → total ${S.totals[S.turn]}`);
+  if(S.mode==='online') netSend({t:'bank',totals:S.totals});
+  if(S.totals[S.turn]>=100) return win(S.turn);
+  endTurn();
+}
+
+function endTurn(){
+  S.turn=1-S.turn; S.turnScore=0; S.locked=[false,false]; S.rollsLeft=4; S.hasRolled=false; S.dice=[1,1];
+  $('turnInfo').textContent=`${turnLabel()} — press ROLL.`;
+  if(S.mode==='online') netSend({t:'turn',turn:S.turn});
+  paint();
+  if(S.mode==='solo'&&S.turn===1&&S.canPlay&&!S.over) setTimeout(()=>{ S.hasRolled=false; doRoll(); },1100);
+}
+
+function win(idx){
+  S.over=true; S.canPlay=false;
+  // Winner takes the pot. Bet was already deducted at game start,
+  // so credit the full pot to the winner's balance on the winner's client.
+  if(S.mode==='online'){
+    if(idx===S.myIndex){ S.balance+=S.pot; }
+    netSend({t:'win',winner:idx,totals:S.totals});
+  } else {
+    if(idx===0) S.balance+=S.pot;
+    // local P2 win or AI win: bet stays lost (pass-and-play / house)
+  }
+  saveBal(); paint();
+  const wname=S.names[idx];
+  log(`🏆 <b>${wname}</b> reached ${S.totals[idx]} and wins <b>${S.pot}</b> chips!`);
+  $('ovTitle').textContent = (S.mode==='online') ? (idx===S.myIndex?'🏆 You win!':'😞 Opponent wins') : (idx===0?'🏆 You win!':'🤖 AI / P2 wins');
+  $('ovText').textContent = `${wname} finished with ${S.totals[idx]} points and takes the ${S.pot}-chip pot. Final: ${S.names[0]} ${S.totals[0]} — ${S.names[1]} ${S.totals[1]}.`;
+  $('overlay').classList.remove('hidden');
+  blip(880);
+}
+
+/* ---- simple AI: hold 6s, stop at 18+ or no rerolls ---- */
+function aiMove(){
+  if(S.mode!=='solo'||S.turn!==1||S.over||!S.canPlay) return;
+  // hold any 6
+  S.locked=[S.dice[0]===6,S.dice[1]===6];
+  if(S.turnScore>=18||S.rollsLeft<=0||(S.locked[0]&&S.locked[1])){ bank(); }
+  else doRoll();
+}
+
+/* ================= ONLINE (PeerJS P2P, room code) ================= */
+let peer=null, conn=null, roomCode=null, isHost=false;
+function genCode(){ let s=''; for(let i=0;i<5;i++) s+=CODE_CHARS[rand(0,CODE_CHARS.length-1)]; return s; }
+function peerId(code){ return 'dice100-v1-'+code; }
+function netSend(o){ try{ if(conn&&conn.open) conn.send(o); }catch(e){} }
+
+/* ---- Waiting-for-connection lobby overlay ---- */
+function showWait(title, code, status){
+  $('waitTitle').textContent = title;
+  $('waitCode').textContent = code || '-----';
+  $('waitCode').style.display = code ? 'block' : 'none';
+  $('waitStatus').innerHTML = (status || 'Please wait') + '<span class="dots"></span>';
+  $('waitOverlay').classList.remove('hidden');
+}
+function hideWait(){ $('waitOverlay').classList.add('hidden'); }
+function setWaitStatus(s){ $('waitStatus').innerHTML = s + '<span class="dots"></span>'; }
+function cancelNet(){ try{ peer&&peer.destroy(); }catch(e){} conn=null; roomCode=null; hideWait(); $('hostInfo').classList.add('hidden'); log('🚫 Room closed.'); }
+
+function hostRoom(){
+  roomCode=genCode(); isHost=true; S.myIndex=0;
+  $('hostInfo').classList.remove('hidden'); $('joinRow').classList.add('hidden');
+  $('roomCode').textContent=roomCode; $('netStatus').textContent='Starting host…';
+  setNames(); S.names[0]=$('nameInput').value||'Host';
+  try{ peer&&peer.destroy(); }catch(e){}
+  showWait('Waiting for opponent…', roomCode, 'Opening room');
+  peer=new Peer(peerId(roomCode));
+  peer.on('open',()=>{
+    $('netStatus').textContent=`Waiting for opponent… (code ${roomCode})`;
+    setWaitStatus('Room open — waiting for opponent to join');
+    log(`📡 Room <b>${roomCode}</b> open. Share the code!`);
+  });
+  peer.on('connection',c=>{
+    setWaitStatus('Opponent found — connecting');
+    conn=c; setupConn();
+    conn.on('open',()=>{
+      S.mode='online'; setNames(); S.names[1]='Guest';
+      $('n0').textContent=S.names[0]; $('n1').textContent=S.names[1];
+      $('netStatus').textContent='✅ Opponent connected! Set bet & START.';
+      $('btnStart').classList.remove('hidden');
+      hideWait();
+      log('✅ Opponent joined the room!');
+      netSend({t:'hello',name:S.names[0]});
+    });
+  });
+  peer.on('error',e=>{ setWaitStatus('Net error: '+e.type+' — try again'); $('netStatus').textContent='Net error: '+e.type+'. Try again.'; log('⚠️ Peer error: '+e.type); });
+  peer.on('disconnected',()=>{ setWaitStatus('Disconnected — retrying'); });
+}
+function joinRoom(){
+  const code=($('joinCode').value||'').trim().toUpperCase();
+  if(code.length<4){ log('❌ Enter a valid room code.'); return; }
+  roomCode=code; isHost=false; S.myIndex=1;
+  S.names[1]=$('myName').value||'Guest';
+  try{ peer&&peer.destroy(); }catch(e){}
+  peer=new Peer(); // random id for guest
+  showWait('Connecting to room…', code, 'Contacting host');
+  log(`📞 Connecting to room <b>${code}</b>…`);
+  peer.on('open',()=>{
+    setWaitStatus('Found room — shaking hands with host');
+    conn=peer.connect(peerId(code),{reliable:true});
+    setupConn();
+    conn.on('open',()=>{ hideWait(); log('✅ Connected! Waiting for host to start…'); $('modePill').textContent='online'; netSend({t:'hello',name:S.names[1]}); });
+  });
+  peer.on('error',e=>{ setWaitStatus('Could not join ('+e.type+') — check the code'); log('⚠️ Could not join ('+e.type+'). Check the code & try again.'); });
+}
+function setupConn(){
+  conn.on('data',onNet);
+  conn.on('close',()=>log('🔌 Opponent disconnected.'));
+}
+function onNet(m){
+  if(!m||!m.t) return;
+  if(m.t==='hello'){ const other = S.myIndex===0?1:0; S.names[other]=m.name||'Opponent';
+    if(S.myIndex===0){$('n1').textContent=S.names[1];} else {$('n0').textContent=S.names[0]; $('modePill').textContent='online';}
+    log(`👋 ${m.name} connected.`); paint(); }
+  if(S.myIndex===1 && m.t==='start'){
+    S.mode='online'; S.names[0]=m.host; $('n0').textContent=S.names[0];
+    S.bet=m.bet;
+    if(S.balance<m.bet){ log('❌ Not enough balance to match bet!'); return; }
+    S.balance-=m.bet; saveBal();
+    S.pot=m.bet*2; S.totals=[0,0]; S.turnScore=0; S.locked=[false,false];
+    S.rollsLeft=4; S.hasRolled=false; S.turn=0; S.over=false; S.canPlay=true;
+    $('modePill').textContent='online';
+    log(`🃏 Host started: bet ${m.bet}, pot ${S.pot}. Host rolls first.`);
+    $('turnInfo').textContent=`${turnLabel()} — wait for opponent…`;
+    paint();
+  }
+  if(m.t==='roll'){
+    S.dice=m.dice.slice(); S.locked=m.locked.slice(); S.rollsLeft=m.rollsLeft; S.hasRolled=true;
+    rollAnim(S.dice[0],S.dice[1],()=>{
+      if(m.bust){ S.turnScore=0; $('turnInfo').textContent=`${S.names[1-S.myIndex]} busted! Your turn…`; }
+      else { S.turnScore=m.turnScore; $('turnInfo').textContent = isMyTurn()?`Your turn — press ROLL.`:`${turnLabel()} is playing… (turn ${m.turnScore})`; }
+      paint();
+    });
+  }
+  if(m.t==='hold'){ S.locked=m.locked.slice(); paint(); }
+  if(m.t==='bank'){ S.totals=m.totals.slice(); S.turnScore=0; log(`💰 ${S.names[1-S.myIndex]} banked → ${S.totals[0]} – ${S.totals[1]}`); paint(); }
+  if(m.t==='turn'){ S.turn=m.turn; S.turnScore=0; S.locked=[false,false]; S.rollsLeft=4; S.hasRolled=false;
+    $('turnInfo').textContent = isMyTurn()?`Your turn — press ROLL.`:`${turnLabel()} is playing…`; paint(); }
+  if(m.t==='win'){ S.totals=m.totals||S.totals; S.over=true; S.canPlay=false;
+    const idx=m.winner; if(idx===S.myIndex) S.balance+=S.pot; saveBal(); paint();
+    $('ovTitle').textContent = idx===S.myIndex?'🏆 You win!':'😞 Opponent wins';
+    $('ovText').textContent=`Final: ${S.names[0]} ${S.totals[0]} — ${S.names[1]} ${S.totals[1]}. Pot: ${S.pot}.`;
+    $('overlay').classList.remove('hidden'); }
+}
+
+/* ================= UI WIRING ================= */
+$('btnSolo').onclick=()=>{ S.myIndex=0; if(startGame('solo',$('betInput').value)) $('btnStart').classList.add('hidden'); };
+$('btnLocal').onclick=()=>{ S.myIndex=0; if(startGame('local',$('betInput').value)) $('btnStart').classList.add('hidden'); };
+$('btnHost').onclick=hostRoom;
+$('btnJoinBtn').onclick=()=>{ $('joinRow').classList.toggle('hidden'); $('hostInfo').classList.add('hidden'); };
+$('btnJoinGo').onclick=joinRoom;
+$('btnCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(roomCode); log('📋 Code copied: '+roomCode); };
+$('btnCancelHost').onclick=()=>{ try{peer&&peer.destroy();conn=null;}catch(e){} hideWait(); $('hostInfo').classList.add('hidden'); };
+$('btnWaitCopy').onclick=()=>{ if(roomCode&&navigator.clipboard) navigator.clipboard.writeText(roomCode); log('📋 Code copied: '+roomCode); };
+$('btnWaitCancel').onclick=cancelNet;
+$('btnRoll').onclick=doRoll;
+$('btnBank').onclick=bank;
+$('btnNew').onclick=()=>{ if(S.mode==='online'&&S.myIndex===0){ startGame('online',$('betInput').value); netSend({t:'start',bet:S.bet,host:S.names[0]});} else if(S.mode!=='online'){ startGame(S.mode==='menu'?'solo':S.mode,$('betInput').value);} $('overlay').classList.add('hidden'); };
+$('btnStart').onclick=()=>{ // host starts online game
+  const bet=Math.max(10,Math.min(500,parseInt($('betInput').value)||50));
+  S.names[0]=$('nameInput').value||'Host';
+  if(!startGame('online',bet)) return;
+  netSend({t:'start',bet:S.bet,host:S.names[0]});
+  $('btnStart').classList.add('hidden');
+};
+$('btnAgain').onclick=()=>{ $('overlay').classList.add('hidden'); $('btnNew').click(); };
+$('btnCloseOv').onclick=()=>$('overlay').classList.add('hidden');
+$('btnRules').onclick=()=>{ $('ovTitle').textContent='📜 How to play';
+  $('ovText').innerHTML='1️⃣ <b>Enter a bet</b> — both players stake the same chips, winner takes the pot.<br>2️⃣ <b>4 rerolls per turn</b> — ROLL, then click a die to HOLD it and REROLL the other (max 4 rerolls). BANK to keep your turn score.<br>3️⃣ <b>First to 100 wins.</b> Doubles give +5 bonus — but <b>snake eyes (1+1) = BUST</b>, you lose the turn!<br><br>🌐 Online: one player hits <b>Create Room</b> and shares the 5-letter code; the other hits <b>Join Room</b> and enters it. Works across networks (P2P).';
+  $('overlay').classList.remove('hidden'); };
+
+init3D(); paint();
+log('👋 Welcome! Pick <b>Solo vs AI</b> for a quick game, or <b>Create/Join Room</b> to play online with a code.');
+</script>
+</body>
+</html>
