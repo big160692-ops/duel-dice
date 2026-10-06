@@ -205,14 +205,19 @@ paintBal();
 
 function setNames(){ S.names[0]=$('nameInput').value||'Player1';
   if(S.mode==='online'){} else if(S.mode==='solo'){S.names=['You','AI 🤖'];} else if(S.mode==='local'){S.names=[$('nameInput').value||'P1','P2'];}
-  $('n0').textContent=S.names[0]; $('n1').textContent=S.names[1];
+  paint();
 }
+// Display-panel mapping: online guests see a mirrored view so that
+// each player always sees THEMSELVES on the left panel. p = panel (0=left),
+// returns the player index shown there.
+function D(p){ return (S.mode==='online'&&S.myIndex===1)?1-p:p; }
 function paint(){
-  $('t0').textContent=S.totals[0]; $('t1').textContent=S.totals[1];
-  $('s0').textContent=`turn: ${S.turn===0?S.turnScore:0} • rerolls: ${S.turn===0?S.rollsLeft:4}`;
-  $('s1').textContent=`turn: ${S.turn===1?S.turnScore:0} • rerolls: ${S.turn===1?S.rollsLeft:4}`;
-  $('p0').classList.toggle('active',S.canPlay&&S.turn===0);
-  $('p1').classList.toggle('active',S.canPlay&&S.turn===1);
+  for(let p=0;p<2;p++){ const i=D(p);
+    $('n'+p).textContent = S.names[i] + ((S.mode==='online'&&i===S.myIndex)?' (you)':'');
+    $('t'+p).textContent = S.totals[i];
+    $('s'+p).textContent = `turn: ${S.turn===i?S.turnScore:0} • rerolls: ${S.turn===i?S.rollsLeft:4}`;
+    $('p'+p).classList.toggle('active',S.canPlay&&S.turn===i);
+  }
   $('lastRoll').textContent = S.hasRolled ? `${S.dice[0]} + ${S.dice[1]} = ${S.dice[0]+S.dice[1]} (turn ${S.turnScore})` : '–';
   $('holdInfo').innerHTML = S.hasRolled ? ` &nbsp; ${S.locked[0]?'<span class="holdTag">DIE 1 HELD</span>':''} ${S.locked[1]?'<span class="holdTag">DIE 2 HELD</span>':''}` : '';
   paintBal();
@@ -297,7 +302,11 @@ function rollAnim(d1v,d2v,done){
   const startQ=dice.map(d=>d.m.quaternion.clone());
   const randQ=dice.map(()=>new THREE.Quaternion().setFromEuler(new THREE.Euler(rand(0,6),rand(0,6),rand(0,6))));
   const endQ=dice.map(d=>targetQuat(d.v));
-  const sx=[-1.3,1.3], ex=[rand(-22,22)/10,rand(-22,22)/10];
+  const sx=dice.map(d=>d.m.position.x);
+  // Separated landing zones (left die stays left, right die stays right)
+  // so the two dice can never land on top of each other / look merged.
+  const ex=[-(0.9+Math.random()*1.4), 0.9+Math.random()*1.4];
+  const ez=[(Math.random()*1.2-0.6),(Math.random()*1.2-0.6)];
   function frame(t){
     const k=Math.min(1,(t-T0)/DUR);
     const e=1-Math.pow(1-k,3);
@@ -306,12 +315,12 @@ function rollAnim(d1v,d2v,done){
       const h=Math.sin(k*Math.PI)*(2.2+Math.random()*.3);
       d.m.position.x=sx[i]+(ex[i]-sx[i])*e;
       d.m.position.y=.8+h;
-      d.m.position.z=Math.sin(k*Math.PI*2+i)*.6;
+      d.m.position.z=ez[i]*e+Math.sin(k*Math.PI*2+i)*.8*(1-e);
       if(k<.65){ d.m.quaternion.slerpQuaternions(startQ[i],randQ[i],k/.65); d.m.rotateX(.35); d.m.rotateY(.3); }
       else { d.m.quaternion.slerpQuaternions(randQ[i],endQ[i],(k-.65)/.35); }
     });
     if(k<1) requestAnimationFrame(frame);
-    else { dice.forEach((d,i)=>{d.m.quaternion.copy(endQ[i]); d.m.position.set(ex[i],.8,0);}); animating=false; done&&done(); }
+    else { dice.forEach((d,i)=>{d.m.quaternion.copy(endQ[i]); d.m.position.set(ex[i],.8,ez[i]);}); animating=false; done&&done(); }
   }
   requestAnimationFrame(frame);
   blip(300+Math.random()*300);
@@ -467,12 +476,12 @@ function hostRoom(){
     conn=c; setupConn();
     conn.on('open',()=>{
       S.mode='online'; setNames(); S.names[1]='Guest';
-      $('n0').textContent=S.names[0]; $('n1').textContent=S.names[1];
       $('netStatus').textContent='✅ Opponent connected! Set bet & START.';
       $('btnStart').classList.remove('hidden');
       hideWait();
       log('✅ Opponent joined the room!');
       netSend({t:'hello',name:S.names[0]});
+      paint();
     });
   });
   peer.on('error',e=>{ setWaitStatus('Net error: '+e.type+' — try again'); $('netStatus').textContent='Net error: '+e.type+'. Try again.'; log('⚠️ Peer error: '+e.type); });
@@ -491,7 +500,7 @@ function joinRoom(){
     setWaitStatus('Found room — shaking hands with host');
     conn=peer.connect(peerId(code),{reliable:true});
     setupConn();
-    conn.on('open',()=>{ hideWait(); log('✅ Connected! Waiting for host to start…'); $('modePill').textContent='online'; netSend({t:'hello',name:S.names[1]}); });
+    conn.on('open',()=>{ hideWait(); log('✅ Connected! Waiting for host to start…'); $('modePill').textContent='online'; netSend({t:'hello',name:S.names[1]}); paint(); });
   });
   peer.on('error',e=>{ setWaitStatus('Could not join ('+e.type+') — check the code'); log('⚠️ Could not join ('+e.type+'). Check the code & try again.'); });
 }
