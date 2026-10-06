@@ -13,7 +13,9 @@
   *{box-sizing:border-box; font-family:'Segoe UI',system-ui,Arial,sans-serif;}
   body{margin:0; background:radial-gradient(1200px 700px at 50% -10%,#1d2a55,#0b1020); color:#fff; min-height:100vh;
     -webkit-text-size-adjust:100%; touch-action:manipulation;}
-  header{text-align:center; padding:8px 10px 2px;}
+  header{text-align:center; padding:6px 10px 2px;}
+  header h1{font-size:22px;}
+  header p{display:none;}
   #modeTabs{position:sticky; top:0; z-index:30; display:flex; gap:8px; padding:8px 10px; overflow-x:auto;
     background:#0b1020ee; border-bottom:1px solid #ffffff1c; backdrop-filter:blur(6px);}
   #modeTabs button{flex:1 0 auto; margin:0; white-space:nowrap;}
@@ -24,9 +26,16 @@
   #app{max-width:none; margin:0; padding:0; display:block;}
   #tableWrap{position:relative; border-radius:0; overflow:hidden; border-top:1px solid #ffffff22; border-bottom:1px solid #ffffff22;
     background:linear-gradient(180deg,#0e5c46,#07352a); min-height:0;}
-  #c3d{width:100%; height:calc(100vh - 215px); height:calc(100svh - 215px); min-height:430px; display:block; cursor:pointer; touch-action:manipulation;}
-  #diceHint{position:absolute; top:8px; left:0; right:0; text-align:center; font-size:12px; opacity:.85;
-    background:#0007; padding:5px; pointer-events:none;}
+  #c3d{width:100%; height:calc(100vh - 130px); height:calc(100svh - 130px); min-height:440px; display:block; cursor:pointer; touch-action:manipulation;}
+  #diceHint{font-size:11px; background:#000a; border-radius:8px; padding:4px 10px; pointer-events:none;}
+  #hudChips{font-size:12px; background:#000a; border-radius:8px; padding:3px 10px; opacity:.95;}
+  #hudChips b{color:var(--accent);}
+  #setupOverlay{position:fixed; inset:0; background:#050816ee; display:flex; align-items:center; justify-content:center; z-index:20; padding:16px; backdrop-filter:blur(4px);}
+  #setupBox{background:var(--panel); border-radius:20px; padding:28px 24px; max-width:400px; width:100%; text-align:center; border:1px solid #ffffff2a; box-shadow:0 24px 80px #000c;}
+  #setupBox h2{margin:0 0 10px; color:var(--accent);}
+  #setupBox label{display:block; font-size:12px; text-align:left; opacity:.8; margin-top:6px;}
+  #btnLogs{position:fixed; right:12px; bottom:12px; z-index:40; width:52px; height:52px; border-radius:50%;
+    font-size:22px; padding:0; margin:0; min-height:0; background:#ffffff22; color:#fff; border:1px solid #ffffff33;}
   #hud{position:absolute; inset:0; z-index:5; pointer-events:none; display:flex; flex-direction:column;
     justify-content:space-between; padding:10px;}
   #hudBottom{display:flex; flex-direction:column; align-items:center; gap:6px;}
@@ -78,7 +87,7 @@
     header h1{font-size:24px;}
     header p{font-size:12.5px; padding:0 8px;}
     #app{padding:0; margin:0;}
-    #c3d{height:calc(100vh - 250px); height:calc(100svh - 250px); min-height:360px;}
+    #c3d{height:calc(100vh - 150px); height:calc(100svh - 150px); min-height:360px;}
     #diceHint{font-size:11px;}
     #side{padding:0 8px 24px;}
     #hud{padding:8px;}
@@ -115,18 +124,20 @@
 <div id="app">
   <div id="tableWrap">
     <canvas id="c3d"></canvas>
-    <div id="diceHint">Click a die (after first roll) to HOLD / UNHOLD it • doubles of 1 = BUST!</div>
     <div id="hud">
       <div id="players">
         <div class="p" id="p0"><div class="nm" id="n0">You</div><div class="tot" id="t0">0</div><div class="sub" id="s0">turn: 0 • rerolls: 4</div></div>
         <div class="p" id="p1"><div class="nm" id="n1">Opponent</div><div class="tot" id="t1">0</div><div class="sub" id="s1">turn: 0 • rerolls: 4</div></div>
       </div>
       <div id="hudBottom">
+        <div id="hudChips">Bal <b id="balanceHud">1000</b> • Pot <b id="potHud">0</b></div>
         <div id="turnTotal">TURN TOTAL: –</div>
-        <p id="turnInfo">Set a bet and start a game.</p>
+        <p id="turnInfo">Pick a mode above to play.</p>
+        <div id="diceHint">Tap a die (after first roll) to HOLD / UNHOLD it • double 1s = BUST!</div>
         <div id="hudBtns">
           <button id="btnRoll">🎲 ROLL</button>
           <button id="btnBank" class="secondary">💰 BANK</button>
+          <button id="btnStart" class="hidden secondary">▶ START</button>
         </div>
       </div>
     </div>
@@ -159,7 +170,7 @@
         <input id="betInput" type="number" min="10" max="500" value="50" />
         <input id="nameInput" placeholder="Your name" maxlength="14" value="Player1" />
       </div>
-      <div style="font-size:13px;">Balance: <b id="balance">1000</b> chips • Pot: <b id="pot">0</b> <button id="btnStart" class="hidden">▶ START GAME</button></div>
+      <div style="font-size:13px;">Balance: <b id="balance">1000</b> chips • Pot: <b id="pot">0</b></div>
       <div style="font-size:12px; opacity:.75">Both players bet the same amount. Winner takes the whole pot.</div>
     </div>
 
@@ -172,8 +183,8 @@
       <div style="font-size:12px;">Latest throw: <b id="lastRoll">–</b> <span id="holdInfo"></span></div>
     </div>
 
-    <div class="card">
-      <h3>GAME LOG <span class="pill" id="modePill">offline</span></h3>
+    <div class="card hidden" id="logCard">
+      <h3>GAME LOG <span class="pill" id="modePill">offline</span> <span style="font-size:11px;opacity:.7">(F7 to hide)</span></h3>
       <div id="log"></div>
     </div>
   </div>
@@ -202,7 +213,21 @@
   </div>
 </div>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v7</span></footer>
+<div id="setupOverlay" class="hidden">
+  <div id="setupBox">
+    <h2 id="setupTitle">Solo vs AI</h2>
+    <div id="setupFields"></div>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnSetupGo">Start</button>
+      <button id="btnSetupCancel" class="ghost">Cancel</button>
+    </div>
+    <div style="font-size:12px; opacity:.75; margin-top:8px;">Balance: <b id="setupBal">1000</b> chips</div>
+  </div>
+</div>
+
+<button id="btnLogs" title="Toggle log (F7)">📜</button>
+
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v8</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -220,7 +245,9 @@ let S = {
   balance: parseInt(localStorage.getItem('dice100_balance')||'1000',10)
 };
 function saveBal(){ localStorage.setItem('dice100_balance', S.balance); }
-function paintBal(){ $('balance').textContent=S.balance; $('pot').textContent=S.pot; }
+function paintBal(){ $('balance').textContent=S.balance; $('pot').textContent=S.pot;
+  if($('balanceHud')) $('balanceHud').textContent=S.balance;
+  if($('potHud')) $('potHud').textContent=S.pot; }
 paintBal();
 
 function setNames(){ S.names[0]=$('nameInput').value||'Player1';
@@ -610,6 +637,60 @@ function hideWait(){ $('waitOverlay').classList.add('hidden'); }
 function setWaitStatus(s){ $('waitStatus').innerHTML = s + '<span class="dots"></span>'; }
 function cancelNet(){ try{ peer&&peer.destroy(); }catch(e){} conn=null; roomCode=null; hideWait(); $('hostInfo').classList.add('hidden'); log('🚫 Room closed.'); }
 
+/* ---- Per-mode setup popup (name + bet, like creating a room) ---- */
+let setupMode=null;
+function openSetup(mode){
+  setupMode=mode;
+  const F=$('setupFields'); F.innerHTML='';
+  $('setupBal').textContent=S.balance;
+  const fld=(id,label,val,type)=>{ F.insertAdjacentHTML('beforeend',
+    `<label>${label}</label><input id="${id}" type="${type||'text'}" value="${val||''}" maxlength="14" />`); };
+  if(mode==='solo'){ $('setupTitle').textContent='🤖 Solo vs AI'; $('btnSetupGo').textContent='▶ Start game';
+    fld('su_name','Your name',$('nameInput').value||'Player1'); fld('su_bet','Bet (10–500)',$('betInput').value,'number'); }
+  else if(mode==='local'){ $('setupTitle').textContent='👥 Local 2 Players'; $('btnSetupGo').textContent='▶ Start game';
+    fld('su_name','Player 1 name',$('nameInput').value||'Player1'); fld('su_name2','Player 2 name','Player2'); fld('su_bet','Bet (10–500)',$('betInput').value,'number'); }
+  else if(mode==='host'){ $('setupTitle').textContent='🌐 Create Room'; $('btnSetupGo').textContent='📡 Create room';
+    fld('su_name','Your name',$('nameInput').value||'Host'); fld('su_bet','Bet (10–500)',$('betInput').value,'number'); }
+  else { $('setupTitle').textContent='🔑 Join Room'; $('btnSetupGo').textContent='📞 Connect';
+    fld('su_code','Room code',''); fld('su_name','Your name',$('myName').value||'Guest'); }
+  $('setupOverlay').classList.remove('hidden');
+}
+function setupBet(){ const b=Math.max(10,Math.min(500,parseInt(($('su_bet')||{}).value)||50)); return b; }
+$('btnSetupCancel').onclick=()=>$('setupOverlay').classList.add('hidden');
+$('btnSetupGo').onclick=()=>{
+  const name=(($('su_name')||{}).value||'Player').slice(0,14);
+  if(setupMode==='solo'){
+    const bet=setupBet();
+    if(bet>S.balance){ $('setupBal').textContent=S.balance+' — not enough for '+bet; return; }
+    $('nameInput').value=name; $('betInput').value=bet;
+    S.myIndex=0; $('setupOverlay').classList.add('hidden');
+    if(startGame('solo',bet)) $('btnStart').classList.add('hidden');
+  } else if(setupMode==='local'){
+    const bet=setupBet();
+    if(bet>S.balance){ $('setupBal').textContent=S.balance+' — not enough for '+bet; return; }
+    const n2=(($('su_name2')||{}).value||'Player2').slice(0,14);
+    $('nameInput').value=name; $('betInput').value=bet;
+    S.myIndex=0; $('setupOverlay').classList.add('hidden');
+    if(startGame('local',bet)){ S.names=[name,n2]; $('btnStart').classList.add('hidden'); paint(); }
+  } else if(setupMode==='host'){
+    const bet=setupBet();
+    if(bet>S.balance){ $('setupBal').textContent=S.balance+' — not enough for '+bet; return; }
+    $('nameInput').value=name; $('betInput').value=bet;
+    $('setupOverlay').classList.add('hidden');
+    hostRoom();
+  } else {
+    const code=(($('su_code')||{}).value||'').trim().toUpperCase();
+    if(code.length<4) return;
+    $('joinCode').value=code; $('myName').value=name;
+    $('setupOverlay').classList.add('hidden');
+    joinRoom();
+  }
+};
+// game log is hidden by default — F7 or the 📜 button toggles it
+function toggleLogs(){ $('logCard').classList.toggle('hidden'); }
+$('btnLogs').onclick=toggleLogs;
+document.addEventListener('keydown',e=>{ if(e.key==='F7'){ e.preventDefault(); toggleLogs(); } });
+
 function hostRoom(){
   roomCode=genCode(); isHost=true; S.myIndex=0;
   $('hostInfo').classList.remove('hidden'); $('joinRow').classList.add('hidden');
@@ -700,15 +781,13 @@ function onNet(m){
 }
 
 /* ================= UI WIRING ================= */
-$('btnSolo').onclick=()=>{ S.myIndex=0; if(startGame('solo',$('betInput').value)) $('btnStart').classList.add('hidden'); };
-$('btnLocal').onclick=()=>{ S.myIndex=0; if(startGame('local',$('betInput').value)) $('btnStart').classList.add('hidden'); };
-$('btnHost').onclick=hostRoom;
-$('btnJoinBtn').onclick=()=>{ $('joinRow').classList.toggle('hidden'); $('hostInfo').classList.add('hidden'); };
+$('btnSolo').onclick=()=>openSetup('solo');
+$('btnLocal').onclick=()=>openSetup('local');
+$('btnHost').onclick=()=>openSetup('host');
+$('btnJoinBtn').onclick=()=>openSetup('join');
 document.querySelectorAll('#modeTabs button').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('#modeTabs button').forEach(x=>x.classList.remove('activeTab'));
   b.classList.add('activeTab');
-  if(b.id==='btnJoinBtn') $('menuCard').scrollIntoView({behavior:'smooth',block:'center'});
-  else $('tableWrap').scrollIntoView({behavior:'smooth'});
 }));
 $('btnJoinGo').onclick=joinRoom;
 $('btnCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(roomCode); log('📋 Code copied: '+roomCode); };
