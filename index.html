@@ -13,17 +13,27 @@
   *{box-sizing:border-box; font-family:'Segoe UI',system-ui,Arial,sans-serif;}
   body{margin:0; background:radial-gradient(1200px 700px at 50% -10%,#1d2a55,#0b1020); color:#fff; min-height:100vh;
     -webkit-text-size-adjust:100%; touch-action:manipulation;}
-  header{text-align:center; padding:14px 10px 4px;}
+  header{text-align:center; padding:8px 10px 2px;}
+  #modeTabs{position:sticky; top:0; z-index:30; display:flex; gap:8px; padding:8px 10px; overflow-x:auto;
+    background:#0b1020ee; border-bottom:1px solid #ffffff1c; backdrop-filter:blur(6px);}
+  #modeTabs button{flex:1 0 auto; margin:0; white-space:nowrap;}
+  #modeTabs button.activeTab{outline:2px solid #fff; filter:brightness(1.12);}
   header h1{margin:0; letter-spacing:2px; font-size:clamp(22px,4vw,38px);}
   header h1 span{color:var(--accent);}
   header p{margin:4px 0 0; opacity:.8; font-size:14px;}
-  #app{display:flex; gap:14px; max-width:1200px; margin:10px auto; padding:0 12px 30px; flex-wrap:wrap;}
-  #tableWrap{flex:2 1 560px; min-width:300px; position:relative; border-radius:18px; overflow:hidden;
-    background:linear-gradient(180deg,#0e5c46,#07352a); border:2px solid #ffffff22; box-shadow:0 20px 60px #0008; min-height:440px;}
-  #c3d{width:100%; height:480px; display:block; cursor:pointer; touch-action:manipulation;}
-  #diceHint{position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:13px; opacity:.9;
-    background:#0007; padding:6px; pointer-events:none;}
-  #side{flex:1 1 300px; min-width:290px; background:var(--panel); border-radius:18px; padding:16px; border:1px solid #ffffff18;}
+  #app{max-width:none; margin:0; padding:0; display:block;}
+  #tableWrap{position:relative; border-radius:0; overflow:hidden; border-top:1px solid #ffffff22; border-bottom:1px solid #ffffff22;
+    background:linear-gradient(180deg,#0e5c46,#07352a); min-height:0;}
+  #c3d{width:100%; height:calc(100vh - 215px); height:calc(100svh - 215px); min-height:430px; display:block; cursor:pointer; touch-action:manipulation;}
+  #diceHint{position:absolute; top:8px; left:0; right:0; text-align:center; font-size:12px; opacity:.85;
+    background:#0007; padding:5px; pointer-events:none;}
+  #hud{position:absolute; inset:0; z-index:5; pointer-events:none; display:flex; flex-direction:column;
+    justify-content:space-between; padding:10px;}
+  #hudBottom{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  #hudBottom #turnTotal{margin:0; font-size:20px; padding:6px 14px; background:#000a;}
+  #hudBottom #turnInfo{margin:0; min-height:0; font-size:13px; background:#000a; border-radius:8px; padding:4px 10px;}
+  #hudBtns button{pointer-events:auto; font-size:18px; padding:14px 30px; min-height:56px;}
+  #side{max-width:900px; margin:12px auto; padding:0 12px 30px; background:none; border:0;}
   .card{background:#ffffff0d; border:1px solid #ffffff14; border-radius:12px; padding:12px; margin-bottom:12px;}
   .card h3{margin:0 0 8px; font-size:15px; letter-spacing:1px; color:var(--accent);}
   button{background:var(--accent); border:0; color:#111; font-weight:700; padding:10px 14px; border-radius:10px;
@@ -67,11 +77,12 @@
   @media(max-width:800px){
     header h1{font-size:24px;}
     header p{font-size:12.5px; padding:0 8px;}
-    #app{flex-direction:column; padding:0 8px 24px; gap:10px; margin-top:8px;}
-    #tableWrap{min-width:0; min-height:0;}
-    #c3d{height:330px;}
+    #app{padding:0; margin:0;}
+    #c3d{height:calc(100vh - 250px); height:calc(100svh - 250px); min-height:360px;}
     #diceHint{font-size:11px;}
-    #side{min-width:0; padding:12px;}
+    #side{padding:0 8px 24px;}
+    #hud{padding:8px;}
+    #hudBtns button{font-size:17px; padding:13px 24px;}
     #players{gap:8px;}
     .p .tot{font-size:24px;}
     .p .nm{font-size:12px;}
@@ -84,7 +95,7 @@
     button{font-size:15px; padding:12px 10px;}
   }
   @media(max-width:380px){
-    #c3d{height:280px;}
+    #c3d{min-height:320px;}
     .row{flex-wrap:wrap;}
   }
 </style>
@@ -94,25 +105,37 @@
   <h1>🎲 DICE RACE <span>100</span></h1>
   <p>Bet chips • 4 rerolls per turn • First to <b>100</b> wins the pot — play solo, local, or online with a room code</p>
 </header>
+<nav id="modeTabs">
+  <button id="btnSolo">🤖 Solo</button>
+  <button id="btnLocal" class="secondary">👥 2P</button>
+  <button id="btnHost">🌐 Create Room</button>
+  <button id="btnJoinBtn" class="secondary">🔑 Join Room</button>
+</nav>
 
 <div id="app">
   <div id="tableWrap">
     <canvas id="c3d"></canvas>
     <div id="diceHint">Click a die (after first roll) to HOLD / UNHOLD it • doubles of 1 = BUST!</div>
+    <div id="hud">
+      <div id="players">
+        <div class="p" id="p0"><div class="nm" id="n0">You</div><div class="tot" id="t0">0</div><div class="sub" id="s0">turn: 0 • rerolls: 4</div></div>
+        <div class="p" id="p1"><div class="nm" id="n1">Opponent</div><div class="tot" id="t1">0</div><div class="sub" id="s1">turn: 0 • rerolls: 4</div></div>
+      </div>
+      <div id="hudBottom">
+        <div id="turnTotal">TURN TOTAL: –</div>
+        <p id="turnInfo">Set a bet and start a game.</p>
+        <div id="hudBtns">
+          <button id="btnRoll">🎲 ROLL</button>
+          <button id="btnBank" class="secondary">💰 BANK</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="side">
     <div class="card" id="menuCard">
-      <h3>1 — CHOOSE MODE</h3>
+      <h3>🌐 ONLINE ROOM</h3>
       <div id="menu">
-        <div class="row">
-          <button id="btnSolo">🤖 Solo vs AI</button>
-          <button id="btnLocal" class="secondary">👥 Local 2P</button>
-        </div>
-        <div class="row">
-          <button id="btnHost">🌐 Create Room</button>
-          <button id="btnJoinBtn" class="secondary">🔑 Join Room</button>
-        </div>
         <div id="joinRow" class="hidden">
           <input id="joinCode" placeholder="Enter room code e.g. K7Q2M" maxlength="12" />
           <input id="myName" placeholder="Your name" maxlength="14" value="Player2" />
@@ -131,7 +154,7 @@
     </div>
 
     <div class="card">
-      <h3>2 — ENTER A BET</h3>
+      <h3>💰 BET</h3>
       <div class="row">
         <input id="betInput" type="number" min="10" max="500" value="50" />
         <input id="nameInput" placeholder="Your name" maxlength="14" value="Player1" />
@@ -141,16 +164,8 @@
     </div>
 
     <div class="card">
-      <h3>3 — PLAY (RACE TO 100)</h3>
-      <div id="players">
-        <div class="p" id="p0"><div class="nm" id="n0">You</div><div class="tot" id="t0">0</div><div class="sub" id="s0">turn: 0 • rerolls: 4</div></div>
-        <div class="p" id="p1"><div class="nm" id="n1">Opponent</div><div class="tot" id="t1">0</div><div class="sub" id="s1">turn: 0 • rerolls: 4</div></div>
-      </div>
-      <p id="turnInfo">Set a bet and start a game.</p>
-      <div id="turnTotal">TURN TOTAL: –</div>
+      <h3>🎲 PLAY (RACE TO 100)</h3>
       <div>
-        <button id="btnRoll">🎲 ROLL</button>
-        <button id="btnBank" class="secondary">💰 BANK</button>
         <button id="btnNew" class="ghost">↺ New round</button>
         <button id="btnRules" class="ghost">📜 Rules</button>
       </div>
@@ -187,7 +202,7 @@
   </div>
 </div>
 
-<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v6</span></footer>
+<footer>3D with Three.js • Online with PeerJS (P2P, no server to host) • Balances saved locally • <span id="buildTag">v7</span></footer>
 
 <script>
 /* ================= STATE ================= */
@@ -618,6 +633,7 @@ function hostRoom(){
       hideWait();
       log('✅ Opponent joined the room!');
       netSend({t:'hello',name:S.names[0]});
+      $('btnStart').scrollIntoView({behavior:'smooth',block:'center'});
       paint();
     });
   });
@@ -688,6 +704,12 @@ $('btnSolo').onclick=()=>{ S.myIndex=0; if(startGame('solo',$('betInput').value)
 $('btnLocal').onclick=()=>{ S.myIndex=0; if(startGame('local',$('betInput').value)) $('btnStart').classList.add('hidden'); };
 $('btnHost').onclick=hostRoom;
 $('btnJoinBtn').onclick=()=>{ $('joinRow').classList.toggle('hidden'); $('hostInfo').classList.add('hidden'); };
+document.querySelectorAll('#modeTabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#modeTabs button').forEach(x=>x.classList.remove('activeTab'));
+  b.classList.add('activeTab');
+  if(b.id==='btnJoinBtn') $('menuCard').scrollIntoView({behavior:'smooth',block:'center'});
+  else $('tableWrap').scrollIntoView({behavior:'smooth'});
+}));
 $('btnJoinGo').onclick=joinRoom;
 $('btnCopy').onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(roomCode); log('📋 Code copied: '+roomCode); };
 $('btnCancelHost').onclick=()=>{ try{peer&&peer.destroy();conn=null;}catch(e){} hideWait(); $('hostInfo').classList.add('hidden'); };
